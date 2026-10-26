@@ -74,7 +74,10 @@ def top_fraction_metrics(
     precision = selected[TARGET_COLUMN].mean()
     baseline_rate = data[TARGET_COLUMN].mean()
 
-    lift = precision / baseline_rate
+    if baseline_rate > 0:
+        lift = precision / baseline_rate
+    else:
+        lift = np.nan
 
     return float(precision), float(lift)
 

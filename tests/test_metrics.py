@@ -59,3 +59,16 @@ def test_ranking_baseline_has_no_probability_metrics(sample_data):
     assert np.isnan(result["roc_auc"])
     assert np.isnan(result["avg_precision"])
     assert np.isnan(result["brier"])
+
+
+def test_lift_undefined_when_no_positive_labels(sample_data):
+    no_purchase = sample_data.copy()
+    no_purchase["repurchased_7d"] = 0
+
+    precision, lift = top_fraction_metrics(
+        no_purchase,
+        use_frequency=True,
+    )
+
+    assert precision == 0.0
+    assert np.isnan(lift)
