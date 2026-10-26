@@ -1,0 +1,19 @@
+# Raw and generated datasets
+data/raw/
+data/interim/
+data/processed/
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# macOS
+.DS_Store
