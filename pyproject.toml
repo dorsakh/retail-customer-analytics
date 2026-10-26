@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "retail-customer-analytics"
+version = "0.1.0"
+description = "Retail customer analytics and repeat-purchase modeling"
+requires-python = ">=3.11"
+dependencies = [
+    "pandas>=2.2",
+    "SQLAlchemy>=2.0",
+    "psycopg[binary]>=3.2"
+]
+
+[project.optional-dependencies]
+modeling = [
+    "numpy>=1.26",
+    "scikit-learn>=1.6",
+    "lightgbm>=4.5",
+    "xgboost>=2.1"
+]
+
+dev = [
+    "pytest>=8"
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
