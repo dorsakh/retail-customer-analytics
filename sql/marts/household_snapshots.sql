@@ -10,17 +10,21 @@ WITH cutoffs AS (
 
 visit_days AS (
     SELECT DISTINCT
-        household_key,
-        day
-    FROM analytics.baskets
+        c.as_of_day,
+        b.household_key,
+        b.day
+    FROM cutoffs c
+    JOIN analytics.baskets b
+        ON b.day BETWEEN c.as_of_day - 89
+                     AND c.as_of_day
 ),
 
 visit_gaps AS (
     SELECT
+        as_of_day,
         household_key,
-        day,
         day - LAG(day) OVER (
-            PARTITION BY household_key
+            PARTITION BY as_of_day, household_key
             ORDER BY day
         ) AS days_since_previous_visit
     FROM visit_days
@@ -88,23 +92,20 @@ basket_history AS (
 
 gap_history AS (
     SELECT
-        c.as_of_day,
-        g.household_key,
+        as_of_day,
+        household_key,
 
-        AVG(g.days_since_previous_visit::NUMERIC)
+        AVG(days_since_previous_visit::NUMERIC)
             AS avg_days_between_visits_90d,
 
-        STDDEV_SAMP(g.days_since_previous_visit::NUMERIC)
+        STDDEV_SAMP(days_since_previous_visit::NUMERIC)
             AS visit_interval_volatility_90d
 
-    FROM cutoffs c
-    JOIN visit_gaps g
-        ON g.day BETWEEN c.as_of_day - 89
-                     AND c.as_of_day
+    FROM visit_gaps
 
     GROUP BY
-        c.as_of_day,
-        g.household_key
+        as_of_day,
+        household_key
 )
 
 SELECT
