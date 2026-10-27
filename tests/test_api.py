@@ -126,3 +126,44 @@ def test_invalid_limit(client):
     )
 
     assert response.status_code == 422
+
+
+def test_explorer_directory_search_is_paginated_and_parameterized(monkeypatch, client):
+    calls = []
+
+    def fake_fetch(query, params=None):
+        calls.append((query, params))
+        if "COUNT(*)" in query:
+            return [{"total": 2}]
+        return [{
+            "household_key": "1907",
+            "predicted_probability": 0.91,
+            "propensity_rank": 7,
+            "score_decile": 10,
+            "dna": {"activity": 92},
+        }]
+
+    monkeypatch.setattr(api, "fetch_rows", fake_fetch)
+    result = client.get(
+        "/explorer/directory",
+        params={"q": "19", "offset": 1, "limit": 5, "sort": "probability"},
+    )
+
+    assert result.status_code == 200
+    assert result.json()["total"] == 2
+    assert result.json()["items"][0]["household_key"] == "1907"
+    assert len(calls) == 2
+    for query, params in calls:
+        assert params["term"] == "19"
+        assert "POSITION(:term IN household_key)" in query
+        assert "19" not in query
+    assert "predicted_probability DESC" in calls[1][0]
+    assert calls[1][1]["offset"] == 1
+
+
+def test_explorer_directory_rejects_unbounded_requests(client):
+    response = client.get("/explorer/directory", params={"limit": 500})
+    assert response.status_code == 422
+
+    response = client.get("/explorer/directory", params={"sort": "SQL"})
+    assert response.status_code == 422

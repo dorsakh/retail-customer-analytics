@@ -1,3 +1,11 @@
+FROM node:24-alpine AS frontend-build
+
+WORKDIR /frontend
+COPY frontend/package*.json ./
+RUN npm ci --no-audit --no-fund
+COPY frontend/ ./
+RUN npm run build
+
 FROM python:3.13-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -6,6 +14,7 @@ ENV PYTHONUNBUFFERED=1
 WORKDIR /app
 
 ENV RETAIL_PROJECT_ROOT=/app
+ENV RETAIL_FRONTEND_DIST=/app/frontend_dist
 
 # LightGBM requires OpenMP support.
 RUN apt-get update && \
@@ -20,6 +29,7 @@ RUN python -m pip install --no-cache-dir ".[serving,inference]"
 
 # Include the versioned inference model.
 COPY artifacts/models/v1/ ./artifacts/models/v1/
+COPY --from=frontend-build /frontend/dist/ ./frontend_dist/
 
 # Prepare a writable reports directory.
 RUN useradd --create-home --uid 10001 appuser && \

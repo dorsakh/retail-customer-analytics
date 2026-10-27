@@ -98,5 +98,4 @@ def test_dna_uses_live_saved_model(monkeypatch, client):
 def test_explorer_home_exists(client):
     response = client.get("/")
     assert response.status_code == 200
-    assert "Beat the Model" in response.text
-    assert "Shopping DNA" in response.text
+    assert "Behind the Basket" in response.text

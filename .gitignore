@@ -1,21 +1,37 @@
-# Raw and generated datasets
+# Source and private data
 data/raw/
 data/interim/
 data/processed/
+data/backups/
+*.sqlite3
 
-# Local configuration and credentials
+# Credentials and local overrides
 .env
 .env.*
 !.env.example
-data/backups/
 
-# Python
+# Python / packaging
 __pycache__/
 *.py[cod]
 *.egg-info/
 .venv/
+venv/
+build/
+dist/
 .pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
 .ipynb_checkpoints/
 
-# macOS
+# Machine-specific artifacts
 .DS_Store
+*.log
+
+# Household-level exports; keep only intentionally selected aggregate reports
+reports/tables/scored_day_*.csv
+reports/tables/holdout_latest_day_scores.csv

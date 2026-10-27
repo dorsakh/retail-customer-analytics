@@ -1,12 +1,15 @@
 import logging
+import os
 from contextlib import asynccontextmanager
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 import numpy as np
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
@@ -36,6 +39,22 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+# Vite production assets are included in the Docker image. For local
+# development the same files are served after `npm run build`.
+FRONTEND_DIST = Path(
+    os.getenv(
+        "RETAIL_FRONTEND_DIST",
+        Path(__file__).resolve().parents[2] / "frontend" / "dist",
+    )
+).resolve()
+
+if (FRONTEND_DIST / "assets").is_dir():
+    app.mount(
+        "/assets",
+        StaticFiles(directory=str(FRONTEND_DIST / "assets")),
+        name="frontend-assets",
+    )
 
 
 # --------------------------------------------------
@@ -289,6 +308,10 @@ def get_customer_prediction(
 
 @app.get("/", include_in_schema=False)
 def explorer_home():
+    built_frontend = FRONTEND_DIST / "index.html"
+    if built_frontend.is_file():
+        return FileResponse(built_frontend)
+    # Compatible local fallback until the first frontend build completes.
     return FileResponse(Path(__file__).with_name("web") / "index.html")
 
 
@@ -362,6 +385,56 @@ def explorer_customers(
         "model_version": model_version,
         "limit": limit,
     })
+
+
+@app.get("/explorer/directory")
+def explorer_directory(
+    as_of_day: int = Query(711, ge=1),
+    model_version: str = Query("v1", min_length=1),
+    q: str | None = Query(None, min_length=1, max_length=32),
+    limit: int = Query(18, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    sort: Literal["rank", "probability", "household"] = "rank",
+):
+    """Search all scored households without loading every record in the UI."""
+    sort_columns = {
+        "rank": "propensity_rank ASC",
+        "probability": "predicted_probability DESC, propensity_rank ASC",
+        "household": "household_key ASC",
+    }
+    order_by = sort_columns[sort]  # Strictly selected from code-owned identifiers.
+    filter_sql = """
+        WHERE as_of_day = :day AND model_version = :version
+    """
+    if q:
+        # POSITION treats the input literally (not as a LIKE wildcard).
+        filter_sql += " AND POSITION(:term IN household_key) > 0"
+    parameters = {
+        "day": as_of_day,
+        "version": model_version,
+        "term": q,
+        "limit": limit,
+        "offset": offset,
+    }
+    count = fetch_rows(
+        f"SELECT COUNT(*) AS total FROM analytics.explorer_profiles {filter_sql}",
+        parameters,
+    )[0]["total"]
+    rows = fetch_rows(f"""
+        SELECT household_key, predicted_probability, propensity_rank,
+               score_decile, dna
+        FROM analytics.explorer_profiles
+        {filter_sql}
+        ORDER BY {order_by}
+        LIMIT :limit OFFSET :offset
+    """, parameters)
+    return {
+        "as_of_day": as_of_day,
+        "total": int(count),
+        "limit": limit,
+        "offset": offset,
+        "items": rows,
+    }
 
 
 @app.get("/explorer/dna/{household_key}")
