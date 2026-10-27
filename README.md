@@ -7,6 +7,10 @@
 
 **Python · SQL · PostgreSQL · LightGBM · scikit-learn · FastAPI · React · TypeScript · Vite · Recharts · Docker Compose · pytest · Vitest · GitHub Actions**
 
+**[Watch the 58-second application walkthrough](docs/assets/retail_demo.mp4)** · [Local setup](docs/SETUP.md)
+
+![Customer Explorer showing the scored household directory](docs/assets/customer_explorer.png)
+
 ## Results at a glance
 
 | Historical evaluation | Result |
@@ -29,12 +33,17 @@ At 20% selection capacity, the model ranked **194 more observed future-purchase 
 ```mermaid
 flowchart TD
     A["Retail transaction CSVs"] --> B["PostgreSQL raw → core → analytics"]
-    B --> C["Point-in-time SQL features · 90-day lookback"]
-    C --> D["Temporal benchmark and holdout evaluation"]
-    C --> E["Versioned LightGBM batch inference"]
-    D --> E
-    E --> F["Prediction tables, run audit and monitoring"]
-    F --> G["FastAPI + React customer explorer"]
+    B --> C["15 point-in-time features · 90-day history"]
+    C --> D["Benchmark + temporal validation"]
+    D --> E["Frozen-model chronological holdout"]
+    E -. "After evaluation" .-> F["Final refit · LightGBM v1 artifact"]
+    C --> F
+    C --> G["Day-711 batch scoring"]
+    F --> G
+    G --> H["PostgreSQL predictions + run audit"]
+    H --> I["FastAPI + React explorer"]
+    H --> J["PSI + delayed-outcome monitoring"]
+    J --> I
 ```
 
 | Component | Engineering implementation |
@@ -44,7 +53,7 @@ flowchart TD
 | **Inference** | Native LightGBM `v1` artifact (~0.5 MB); exact feature-schema and SHA-256 checks; ranked probabilities and deciles stored through idempotent PostgreSQL upserts |
 | **Automation** | Batch validation, per-day PostgreSQL advisory locks, audited `running/succeeded/failed/skipped` states; optional 24-hour Docker Compose scheduler |
 | **Monitoring** | Feature/prediction population stability index (PSI), missingness alerts, delayed seven-day outcome evaluation, persisted operational reports |
-| **Delivery** | FastAPI/Pydantic/OpenAPI, React 19/TypeScript/Recharts, multistage Docker build, non-root API container, automated Python and frontend CI |
+| **Delivery** | FastAPI/Pydantic/OpenAPI, React 19/TypeScript/Recharts, Docker image with non-root API container, automated Python and frontend CI |
 
 ## Behind the Basket — customer explorer
 
@@ -56,6 +65,10 @@ The React interface queries real PostgreSQL prediction and profile tables; the d
 - **Model Pulse:** review persisted PSI/missingness reports and audited batch-execution history.
 
 The shared contextual customer drawer keeps the original view and selection visible. The compiled React app is served by FastAPI; Vite proxies the same API in development.
+
+![Behavioral Paradox comparing customers with contrasting purchase probabilities](docs/assets/behavioral_paradox.png)
+
+The screenshots and [one-minute walkthrough](docs/assets/retail_demo.mp4) were captured from the locally running application with the real-data PostgreSQL backend. This is a recorded demo, **not a publicly hosted service**.
 
 ## Evaluation protocol
 
