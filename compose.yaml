@@ -1,0 +1,39 @@
+services:
+  db:
+    image: postgres:18
+
+    environment:
+      POSTGRES_DB: retail_analytics
+      POSTGRES_USER: retail
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+
+    volumes:
+      - retail_db_data:/var/lib/postgresql
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U retail -d retail_analytics"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+    restart: unless-stopped
+
+  api:
+    image: retail-customer-analytics:v1
+    build: .
+
+    environment:
+      RETAIL_DATABASE_URL: "postgresql+psycopg://retail:${POSTGRES_PASSWORD}@db:5432/retail_analytics"
+
+    ports:
+      - "127.0.0.1:8000:8000"
+
+    depends_on:
+      db:
+        condition: service_healthy
+
+    restart: unless-stopped
+
+
+volumes:
+  retail_db_data:
