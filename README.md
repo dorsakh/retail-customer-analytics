@@ -3,139 +3,108 @@
 [![Python Tests](https://github.com/dorsakh/retail-customer-analytics/actions/workflows/python-tests.yml/badge.svg)](https://github.com/dorsakh/retail-customer-analytics/actions/workflows/python-tests.yml)
 [![React Frontend](https://github.com/dorsakh/retail-customer-analytics/actions/workflows/frontend-tests.yml/badge.svg)](https://github.com/dorsakh/retail-customer-analytics/actions/workflows/frontend-tests.yml)
 
-**End-to-end retail data engineering, customer propensity modeling, and batch inference** — from 2.6M transaction lines in PostgreSQL to a tested LightGBM scoring service, automated monitoring, and an interactive customer explorer.
+**An end-to-end customer repurchase prediction system:** PostgreSQL data modeling, temporally evaluated LightGBM, versioned batch inference, drift monitoring, and a React customer explorer. Built on the [dunnhumby *The Complete Journey*](https://www.dunnhumby.com/source-files/) retail dataset.
 
-Built with **PostgreSQL · SQLAlchemy · Python · LightGBM · scikit-learn · FastAPI · React · TypeScript · Vite · Recharts · Docker Compose · pytest · Vitest · GitHub Actions**.
+**Python · SQL · PostgreSQL · LightGBM · scikit-learn · FastAPI · React · TypeScript · Vite · Recharts · Docker Compose · pytest · Vitest · GitHub Actions**
 
-## At a glance
+## Results at a glance
 
-| Data and system | Measured result |
+| Historical evaluation | Result |
 |---|---:|
-| Source transactions / baskets / households | 2,595,732 / 276,484 / 2,500 |
-| Labeled training/evaluation snapshots | 41,507 across 2,493 households |
-| Behavioral features / prediction horizon | 15 / 7 days |
-| Chronological holdout | 6,977 observations; days 630, 660, 690 |
-| LightGBM holdout ROC-AUC / average precision | **0.809 / 0.858** |
-| Precision@top 20% / lift | **94.1% / 1.64×** |
-| Improvement over recency + frequency | **+13.9 percentage points** (95% CI: +11.8 to +15.9) |
-| Latest completed inference batch | 2,326 households on day 711 |
-| Versioned native model artifact | ~0.5 MB |
-| Automated tests | **46 Python + 4 React UI** passing locally; CI checks both |
+| Transaction lines / baskets / source households | **2.60M / 276,484 / 2,500** |
+| Labeled observations / modeled households | **41,507 / 2,493** |
+| Chronological holdout | **6,977 observations** across 3 future dates |
+| LightGBM ROC-AUC / average precision | **0.809 / 0.858** |
+| Holdout Brier score | **0.176** |
+| Precision@20% / lift | **94.1% / 1.64×** |
+| Gain over recency–frequency ranking at the same capacity | **+13.9 percentage points** (95% household-bootstrap CI: +11.8 to +15.9 pp) |
+| Latest production-style batch | **2,326 households** scored at observation day 711 |
 
-The 20%-capacity model shortlist identified **194 more observed future-purchase instances** than the recency/frequency baseline across three holdout dates, with exactly the same number of selected observations (1,397). This is **better prediction, not evidence of incremental sales** from marketing interventions.
+At 20% selection capacity, the model ranked **194 more observed future-purchase instances** in its shortlist than the recency/frequency baseline (1,397 selected observations in either strategy). This measures **ranking quality**, not incremental conversions or revenue caused by targeting.
 
 ![Holdout Precision@20% and household-bootstrap intervals](docs/assets/holdout_precision_ci.png)
 
-## What was built
-
-| Area | Implementation |
-|---|---|
-| **Data engineering** | `raw → core → analytics` PostgreSQL layers; key integrity, row-count and financial reconciliation; basket/household marts; parameterized point-in-time feature SQL |
-| **ML evaluation** | Five-model benchmark, rolling-origin validation, chronological holdout, probability calibration, feature importance, 1,000-draw household-cluster bootstrap for the original Precision@20% comparison |
-| **Inference** | Versioned LightGBM `v1` artifact, feature-contract and SHA-256 validation, 2,326-household batch scoring, ranked probabilities/deciles persisted in PostgreSQL |
-| **Automation** | Idempotent upserts, audited success/failure/skip states, per-day PostgreSQL advisory locking, optional 24-hour Docker Compose scheduler |
-| **Monitoring** | Feature/prediction PSI, missingness alerts, historical baselines, delayed seven-day outcome checks, persisted reports and API endpoints |
-| **API + frontend** | FastAPI/Pydantic, OpenAPI; typed React + TypeScript interface with searchable/paginated customer directory, profile drawer, model challenge, behavioral comparisons, and monitoring |
-| **Quality + packaging** | pytest and Vitest/React Testing Library; independent Python and frontend GitHub Actions CI; reproducible multi-stage Docker build; PostgreSQL, API, and opt-in scheduler |
-
-### Architecture
+## System overview
 
 ```mermaid
-flowchart TB
-    A["The Complete Journey CSVs"] --> B["PostgreSQL raw + core"]
-    B --> C["Analytics marts + 15 historical features"]
-    C --> D["Temporal ML benchmark + holdout"]
-    C --> E["Point-in-time batch scoring"]
-    D --> F["Versioned LightGBM artifact"]
-    F --> E
-    E --> G["Prediction tables + run audit"]
-    G --> H["FastAPI + browser explorer"]
-    E --> I["Drift + delayed-outcome monitoring"]
+flowchart TD
+    A["Retail transaction CSVs"] --> B["PostgreSQL raw → core → analytics"]
+    B --> C["Point-in-time SQL features · 90-day lookback"]
+    C --> D["Temporal benchmark and holdout evaluation"]
+    C --> E["Versioned LightGBM batch inference"]
+    D --> E
+    E --> F["Prediction tables, run audit and monitoring"]
+    F --> G["FastAPI + React customer explorer"]
 ```
 
-### Behind the Basket — interactive explorer
+| Component | Engineering implementation |
+|---|---|
+| **Data platform** | Three PostgreSQL layers; referential, row-count, and monetary reconciliation; parameterized point-in-time feature marts; 15 behavioral inputs |
+| **Modeling** | Five-model benchmark, rolling-origin validation, fixed chronological holdout, probability diagnostics, feature importance, household-cluster bootstrap |
+| **Inference** | Native LightGBM `v1` artifact (~0.5 MB); exact feature-schema and SHA-256 checks; ranked probabilities and deciles stored through idempotent PostgreSQL upserts |
+| **Automation** | Batch validation, per-day PostgreSQL advisory locks, audited `running/succeeded/failed/skipped` states; optional 24-hour Docker Compose scheduler |
+| **Monitoring** | Feature/prediction population stability index (PSI), missingness alerts, delayed seven-day outcome evaluation, persisted operational reports |
+| **Delivery** | FastAPI/Pydantic/OpenAPI, React 19/TypeScript/Recharts, multistage Docker build, non-root API container, automated Python and frontend CI |
 
-- **Customer Explorer:** search and paginate **all 2,326** day-711 households; open any profile in a contextual drawer with purchase timeline, all 15 input features, five cohort-relative behavior percentiles, and live model inference.
-- **Behavioral Paradox:** compare matched households with similar shopping recency/frequency but divergent model scores; expand native LightGBM contributions and inspect either customer **without leaving the comparison**.
-- **Beat the Model:** estimate seven-day repurchase probability on a hidden-outcome historical case; reveal the label, compare Brier losses, and track the session score.
-- **Model Pulse:** inspect real PSI/missingness monitoring and audited, idempotent pipeline runs.
+## Behind the Basket — customer explorer
 
-The responsive, accessible frontend uses **React 19, TypeScript, Vite, Recharts, Lucide icons**, and the Fetch API. Customer search is **server-side, parameterized, and paginated**; the shared profile drawer maintains page context. The FastAPI service serves the compiled app in production, while Vite proxies API calls during development.
+The React interface queries real PostgreSQL prediction and profile tables; the day-711 directory contains **all 2,326 scored households**, not a synthetic sample.
 
-## Evaluation design
+- **Customer Explorer:** server-side search, sorting, and pagination; profile drawer with purchase timeline, 15 features, five cohort-relative shopping metrics, and live model inference.
+- **Behavioral Paradox:** compare households with similar recency and shopping frequency but different scores; inspect their feature differences and native LightGBM contributions without leaving the comparison.
+- **Beat the Model:** predict seven-day repurchase on historical holdout cases, then reveal the outcome and compare Brier losses against the holdout model.
+- **Model Pulse:** review persisted PSI/missingness reports and audited batch-execution history.
 
-| Split | Observation days | Rows |
+The shared contextual customer drawer keeps the original view and selection visible. The compiled React app is served by FastAPI; Vite proxies the same API in development.
+
+## Evaluation protocol
+
+| Partition | Observation days | Rows |
 |---|---|---:|
-| Train | 180–540, every 30 days | 29,902 |
+| Training | 180–540, at 30-day intervals | 29,902 |
 | Validation | 570, 600 | 4,628 |
-| Final holdout | 630, 660, 690 | 6,977 |
+| **Unseen chronological holdout** | **630, 660, 690** | **6,977** |
 
-Historical features never use post-observation transactions. The **holdout model** is fitted on train + validation only (34,530 rows); the **production `v1` model** is subsequently fitted on all 41,507 labeled rows. The refitted artifact is **not** used to claim out-of-sample holdout accuracy or power the historical prediction game.
+Every observation uses **15 features from the previous 90 days** to predict **any purchase in the following seven days**. The holdout estimator was fitted only through day 600. The saved `v1` scoring model was subsequently refitted on all 41,507 labeled observations; **its training-window predictions are not used as holdout metrics**. Whole-household bootstrap resampling accounts for repeated snapshots of the same household. See [technical notes](docs/ENGINEERING.md) for model comparisons, calibration, capacity curves, uncertainty, and limitations.
 
-Across capacities of 5%, 10%, 20%, 30%, 40%, and 50% selected per observation day, `business.py` reports precision, purchaser capture, lift, and paired household-bootstrap uncertainty. At 20% capacity, the baseline achieved **80.2%** precision against LightGBM's **94.1%**; the 95% interval for the gain excludes zero.
+## Run locally
 
-## Running the project
-
-Requires Python 3.11+, PostgreSQL (tested with 18), `psql`, and the [dunnhumby *The Complete Journey* data](https://www.dunnhumby.com/source-files/). Original transaction files are **not committed**. See [Setup and runbook](docs/SETUP.md) for loading the SQL layers and configuring local or Docker databases.
+The repository contains code, SQL definitions, tests, and the versioned model artifact; **the original transaction CSVs and PostgreSQL database are not included**. Reproducing the real-data explorer requires loading the source dataset, creating the analytical tables, and materializing explorer profiles first. Follow the [setup and runbook](docs/SETUP.md) for the full sequence.
 
 ```bash
-# Python dependencies
+# Install modeling, serving, and test dependencies
 python -m pip install -e ".[modeling,serving,dev,reporting]"
 
-# Once the PostgreSQL analytics schema and saved v1 model are available
+# Once the real-data database and model artifact are configured
 python -m retail_analytics.pipeline --dry-run
 python -m retail_analytics.pipeline
 python -m retail_analytics.monitor --as-of-day 711
 
-# Independent holdout analysis (re-fits a model through day 600 only)
-python -m retail_analytics.business
-
-# Test suite
+# Verify the Python code
 python -m pytest -q
+
+# Build and test the React UI
+npm --prefix frontend ci
+npm --prefix frontend test
+npm --prefix frontend run build
 ```
 
-For the local interactive app, populate the explorer tables as described in the runbook, then build the frontend once and launch FastAPI:
+After preparing the PostgreSQL service as documented, the API and opt-in daily scheduler can run locally with `docker compose --profile automation up -d --build`. The React explorer is served on `http://127.0.0.1:8000/` in that Docker configuration.
 
-```bash
-cd frontend
-npm ci
-npm run build
-cd ..
-python -m uvicorn retail_analytics.api:app --host 127.0.0.1 --port 8001
-```
-
-Open `http://127.0.0.1:8001/` (explorer) or `/docs` (OpenAPI). With an already populated **Docker PostgreSQL database**, the opt-in recurring batch can run via:
-
-```bash
-docker compose --profile automation up -d --build
-```
-
-Docker Compose provides **local container deployment**, not public cloud hosting. The GitHub Actions workflow implements **CI (tests)**, not automated deployment/CD. Source-data ingestion and materialized-view refresh remain separate upstream operations.
-
-## Repository map
+## Repository structure
 
 ```text
-sql/{schema,load,marts,checks,analysis}/   PostgreSQL ELT + integrity checks
-src/retail_analytics/
-  data.py, models.py, benchmark.py         Modeling datasets and selection
-  evaluate.py, uncertainty.py, business.py Holdout, bootstrap, capacity analysis
-  train_final.py, score.py, pipeline.py    Model artifact and repeatable inference
-  monitor.py, scheduler.py                PSI, delayed outcomes, automation
-  api.py, explorer.py, build_explorer.py   REST API and interactive case data
-  web/index.html                          Legacy no-build fallback
-frontend/src/{pages,components}/         React + TypeScript frontend
-frontend/package-lock.json               Reproducible npm dependencies
-tests/                                    pytest
-artifacts/models/v1/                     ~0.5 MB model + version metadata
-reports/{tables,figures}/                Derived evaluation outputs
-docs/                                     Reproduction + engineering notes
-Dockerfile, compose.yaml                 Containerized services
-.github/workflows/{python-tests,frontend-tests}.yml  CI
+sql/{schema,load,marts,checks,analysis}/   PostgreSQL ELT, point-in-time features, validation
+src/retail_analytics/                    Training, evaluation, inference, monitoring, API
+frontend/src/{pages,components}/          React + TypeScript explorer
+tests/                                    Python unit and API tests
+docs/                                     Reproduction runbook and engineering notes
+reports/{tables,figures}/                 Selected aggregate results and visualizations
+artifacts/models/v1/                      Native model and integrity metadata
+.github/workflows/                       Python and React test/build CI
+Dockerfile, compose.yaml                  Local PostgreSQL/API/scheduler containers
 ```
 
-## Engineering details
+**Verification:** 46 Python tests and 4 React UI tests at the documented release, plus type-checked frontend builds and GitHub Actions CI. Batch scoring is repeatable/idempotent; the day-711 monitoring outcome status is `pending` because the source dataset ends before that prediction window matures.
 
-- [Technical notes](docs/ENGINEERING.md) — all feature groups, benchmark design, capacity curves, artifact integrity, batch locking, monitoring thresholds, and limitations.
-- [Setup and runbook](docs/SETUP.md) — input data, database build order, model training, serving, Docker, and demo initialization.
-
-**Scope:** This dataset follows a fixed historical cohort of frequent-shopping households. The model predicts seven-day return propensity, **not** the causal benefit of a coupon or marketing contact. The current scheduler does not ingest new transactions.
+**Scope:** Local Docker deployment and CI are implemented; public cloud hosting, automatic CD, MLflow tracking, and causal marketing-uplift measurement are **not** claimed. Results describe future purchase propensity for historically observed households, not cold-start generalization.
