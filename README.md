@@ -55,7 +55,7 @@ flowchart TD
 | **Monitoring** | Feature/prediction population stability index (PSI), missingness alerts, delayed seven-day outcome evaluation, persisted operational reports |
 | **Delivery** | FastAPI/Pydantic/OpenAPI, React 19/TypeScript/Recharts, Docker image with non-root API container, automated Python and frontend CI |
 
-## Behind the Basket — customer explorer
+## Behind the Basket: customer explorer
 
 The React interface queries real PostgreSQL prediction and profile tables; the day-711 directory contains **all 2,326 scored households**, not a synthetic sample.
 
