@@ -647,6 +647,51 @@ dataset's redistribution terms.
 
 ## Generated Outputs
 
+### Holdout capacity comparison
+
+To see whether a learned ranking finds more *actual future purchasers* than a
+simple recency-and-frequency rule when a team can review only a fixed share of
+households, run:
+
+```bash
+python -m retail_analytics.business
+```
+
+The report ranks households separately on holdout days **630, 660, and 690**,
+selecting the highest 5%, 10%, 20%, 30%, 40%, 50%, or 100% on each day.
+For each capacity, it compares:
+
+- **Precision:** share of selected households that bought within seven days.
+- **Capture rate:** share of all future purchasers represented in the shortlist.
+- **Lift:** shortlist precision divided by the overall holdout repurchase rate.
+- **Extra purchasers identified:** the difference between model and baseline
+  counts *at the same capacity*, not purchases caused by outreach.
+
+Results include pooled totals, day-level results, and paired 95% household
+bootstrap intervals for the precision gap. Each bootstrap draw resamples whole
+households across all holdout dates. The model is fitted to training and
+validation observations **through day 600 only**; the saved production `v1`
+model is not used, because it has already trained on the holdout outcomes.
+
+Outputs:
+
+```text
+reports/tables/business_priority_curve.csv
+reports/tables/business_priority_by_day.csv
+reports/tables/business_priority_uncertainty.csv
+reports/figures/business_priority_curve.png
+```
+
+The PNG requires the optional `reporting` dependencies. To generate tables
+without a figure, use `python -m retail_analytics.business --no-plot`. To
+change bootstrap sample count, use `--bootstrap 1000` (default 500).
+
+**Interpretation limit:** a propensity model prioritizes customers likely to
+buy anyway. Better retrieval of eventual purchasers does not establish which
+customers respond to marketing, incremental conversions, or revenue/ROI.
+Those require intervention data and a causal evaluation.
+
+
 The benchmark and holdout evaluation scripts save performance metrics, diagnostic tables, and household-level propensity scores in:
 
 `reports/tables/`
