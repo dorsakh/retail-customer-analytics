@@ -147,6 +147,43 @@ def list_pipeline_runs(limit: int = Query(20, ge=1, le=100)):
 
 
 # --------------------------------------------------
+# Model monitoring (aggregate, no household identifiers)
+# --------------------------------------------------
+
+@app.get("/monitoring/latest")
+def latest_monitoring_report(model_version: str = Query("v1")):
+    rows = fetch_rows("""
+        SELECT as_of_day, model_version, source_max_day, household_count,
+               reference_count, checked_at, drift_status, feature_drift,
+               prediction_drift, alerts, label_status, outcome_metrics
+        FROM analytics.monitoring_reports
+        WHERE model_version = :version
+        ORDER BY as_of_day DESC
+        LIMIT 1
+    """, {"version": model_version})
+    if not rows:
+        raise HTTPException(status_code=404, detail="No monitoring report exists yet.")
+    return rows[0]
+
+
+@app.get("/monitoring/history")
+def monitoring_history(
+    model_version: str = Query("v1"),
+    limit: int = Query(20, ge=1, le=100),
+):
+    return fetch_rows("""
+        SELECT as_of_day, model_version, source_max_day, checked_at,
+               drift_status, label_status,
+               jsonb_array_length(alerts) AS alert_count,
+               outcome_metrics
+        FROM analytics.monitoring_reports
+        WHERE model_version = :version
+        ORDER BY as_of_day DESC
+        LIMIT :limit
+    """, {"version": model_version, "limit": limit})
+
+
+# --------------------------------------------------
 # Ranked customer predictions
 # --------------------------------------------------
 

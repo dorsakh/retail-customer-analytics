@@ -4,6 +4,7 @@ import argparse
 import logging
 from time import monotonic, sleep
 
+from .monitor import run_monitor
 from .pipeline import run_once
 
 
@@ -19,6 +20,12 @@ def serve(interval_hours: float, refresh_explorer: bool = False) -> None:
         try:
             result = run_once(refresh_explorer=refresh_explorer)
             logger.info("Automated batch: %s", result)
+            try:
+                report = run_monitor(as_of_day=result["as_of_day"])
+                logger.info("Model monitoring: %s", report)
+            except Exception:
+                # Monitoring cannot undo a successfully committed scoring run.
+                logger.exception("Monitoring failed; scoring remains available")
         except Exception:
             # Keep the scheduler alive; each failed run is recorded by pipeline.py.
             logger.exception("Automated batch failed; will retry next interval")

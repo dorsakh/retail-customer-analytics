@@ -560,6 +560,48 @@ upstream before this job can see it. Skipping compares the observation day,
 model checksum, and stored row count; it cannot detect all same-day source
 corrections automatically, which is why `--force` exists.
 
+## Model Monitoring
+
+The monitoring job compares the latest scored households against the
+**training-period feature distributions** (observation days 180–540).
+It produces two kinds of descriptive drift signals:
+
+- Feature-level Population Stability Index (PSI), with missing values treated
+  as their own bin and explicit missing-rate changes.
+- Change in the saved LightGBM model's predicted-probability distribution.
+
+PSI greater than or equal to **0.20** is flagged as a configurable
+*review threshold*, not proof of accuracy degradation. A feature is also
+flagged if its missing rate increases by at least five percentage points.
+Historical reference scores are in-sample model outputs; their distribution
+is used only as a descriptive reference, **not** an estimate of performance.
+
+Run monitoring for the existing day-711 predictions with:
+
+```bash
+python -m retail_analytics.monitor --as-of-day 711
+```
+
+The first execution creates the small `analytics.monitoring_reports` table.
+Results are available at `GET /monitoring/latest` and
+`GET /monitoring/history`; both endpoints return aggregate diagnostics, not
+household-level activity.
+
+The Docker scheduler also runs monitoring after each scoring attempt,
+including when an already-scored day is skipped. Monitoring errors are logged
+without undoing a successful scoring job.
+
+**Delayed labels:** the final saved `v1` model was trained through day 690.
+For scoring days **after 690**, actual seven-day performance is calculated
+only once the database contains data through at least
+`as_of_day + 7`. Before then, the report says `pending`. Historical
+training dates are never passed off as new out-of-sample evaluations.
+When newer basket data arrives, pending earlier windows are evaluated
+automatically using Brier, ROC AUC, Precision@20%, and lift.
+
+With the provided data ending on day 711, the day-711 label status should be
+`pending`. No new transactions are ingested by this job.
+
 ## Behind the Basket — Interactive Explorer
 
 The project also includes a small FastAPI-hosted browser application with three
