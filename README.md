@@ -1,5 +1,7 @@
 # Retail Customer Analytics
 
+[![Python Tests](https://github.com/dorsakh/retail-customer-analytics/actions/workflows/python-tests.yml/badge.svg)](https://github.com/dorsakh/retail-customer-analytics/actions/workflows/python-tests.yml)
+
 An end-to-end retail analytics and machine learning project built with PostgreSQL and Python, using dunnhumby's *The Complete Journey* dataset.
 
 The project transforms transaction-level retail data into a relational analytics model, examines household purchasing behavior, and predicts whether an existing customer will make another purchase within the next seven days.
