@@ -34,6 +34,25 @@ services:
 
     restart: unless-stopped
 
+  # Optional: enable with docker compose --profile automation up -d --build
+  # This repeats scoring while Docker is running; it cannot ingest new data.
+  scheduler:
+    image: retail-customer-analytics:v1
+    build: .
+    profiles: ["automation"]
+    command:
+      - python
+      - -m
+      - retail_analytics.scheduler
+      - --interval-hours
+      - "24"
+    environment:
+      RETAIL_DATABASE_URL: "postgresql+psycopg://retail:${POSTGRES_PASSWORD}@db:5432/retail_analytics"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
 
 volumes:
   retail_db_data:

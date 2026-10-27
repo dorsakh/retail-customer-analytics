@@ -503,6 +503,106 @@ python -m pytest -q
 
 The test suite covers temporal split boundaries, non-overlapping prediction windows, ranking metrics, edge cases, and bootstrap calculations.
 
+## Automated Batch Scoring
+
+The scored household data can be refreshed through a single operational
+entrypoint. Instead of manually running a sequence of commands, the batch job
+checks its inputs, validates the saved model checksum, runs the existing
+scorer, verifies the number of rows written, and records success or failure.
+
+In the same Python environment used for scoring:
+
+```bash
+python -m retail_analytics.pipeline --dry-run
+python -m retail_analytics.pipeline
+```
+
+The default observation day is the **latest day in the existing
+`analytics.baskets` materialized view**. Run history is created automatically
+in `analytics.pipeline_runs`. Successful batches are skipped on later runs
+for the same day and unchanged model; use `--force` when historical source
+data was corrected. Prediction upserts remain idempotent. After the first run,
+`GET /pipeline/runs` also exposes recent job statuses and row counts through
+the API without revealing internal error messages.
+
+Useful options:
+
+- `--as-of-day 711` scores an explicit observation day.
+- `--force` reruns a previously successful day.
+- `--dry-run` checks features without writing predictions or run logs.
+- `--refresh-explorer` additionally rebuilds the interactive demo's derived
+  profile tables (requires the Explorer schema and its supporting data).
+
+The same job runs inside Docker against the **Docker database**, which is
+separate from the local Mac PostgreSQL instance:
+
+```bash
+docker compose build api
+docker compose run --rm api python -m retail_analytics.pipeline
+```
+
+For automatic periodic scoring while Docker is running:
+
+```bash
+docker compose --profile automation up -d --build
+```
+
+The optional `scheduler` service runs the job when it starts and every
+24 hours afterward. Observe its status using
+`docker compose logs --tail=30 scheduler`. It is not a 24/7 cloud scheduler:
+it stops when the Docker host stops. The scheduler does not rebuild a model
+without an explicit model lifecycle policy.
+
+**Scope:** the source transactions are a fixed historical dataset. This job
+does **not** ingest new transactions or refresh `analytics.baskets` itself.
+If new data arrives, ingestion and materialized-view refresh must complete
+upstream before this job can see it. Skipping compares the observation day,
+model checksum, and stored row count; it cannot detect all same-day source
+corrections automatically, which is why `--force` exists.
+
+## Behind the Basket — Interactive Explorer
+
+The project also includes a small FastAPI-hosted browser application with three
+interactive activities:
+
+1. **Beat the Model:** estimate seven-day repurchase probabilities on historical
+   holdout cases, then compare Brier errors with predictions from a model trained
+   on the development period only.
+2. **Shopping DNA:** browse cohort-relative behavioral percentiles and obtain
+   a fresh prediction from the saved production model for a selected household.
+3. **Behavioral Paradox:** compare households with the same recency and similar
+   frequency but different model predictions, with native LightGBM raw-score
+   contribution differences.
+
+This application uses two additional tables of *derived* data. After the
+standard pipeline has been run and day 711 has been scored, prepare them with:
+
+```bash
+psql -d retail_analytics -v ON_ERROR_STOP=1 -f sql/schema/explorer.sql
+python -m retail_analytics.build_explorer --as-of-day 711
+python -m uvicorn retail_analytics.api:app --host 127.0.0.1 --port 8001
+```
+
+Open `http://127.0.0.1:8001/` for the explorer or `/docs` for the underlying API.
+Port 8001 avoids a conflict if Docker Compose already exposes the API on 8000.
+These commands use the **local PostgreSQL database** configured by
+`RETAIL_DATABASE_URL`; the Compose database is a separate instance and will
+need its own explorer schema and derived rows before serving this UI.
+The data-preparation command is safe to rerun; it upserts the derived records
+without touching raw data or the original train/validation/test tables.
+
+**Evaluation boundary:** game cases come from days 630, 660, and 690, scored by
+a model fitted on development data through day 600. The final `v1` artifact was
+later refitted on all labeled snapshots and is used only for latest-day live
+inference. Do not treat that refitted artifact as a new independent holdout
+evaluation. Percentiles and feature contributions describe associations, not
+behavioral causation or intervention uplift.
+
+The source dataset and secret environment files must not be published as part
+of the explorer deployment. For cloud deployment, transfer only the two derived
+explorer tables into the restricted managed database, after reviewing the
+dataset's redistribution terms.
+
 ## Generated Outputs
 
 The benchmark and holdout evaluation scripts save performance metrics, diagnostic tables, and household-level propensity scores in:

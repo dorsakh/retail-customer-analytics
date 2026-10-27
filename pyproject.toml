@@ -42,3 +42,6 @@ inference = [
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+retail_analytics = ["web/*.html", "sql/*.sql"]
