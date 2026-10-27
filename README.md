@@ -314,6 +314,10 @@ The observed seven-day repurchase rate increases from approximately 16.9% in the
 
 The decile summaries also include historical purchase frequency and recency, supporting interpretation of the customer groups.
 
+The evaluation also exports `reports/tables/holdout_latest_day_scores.csv`, a household-level ranking for the latest holdout observation day (day 690). It contains 2,322 unique households, ranked by predicted seven-day repurchase probability, with their corresponding propensity deciles. Actual repurchase outcomes are excluded from the exported scores.
+
+This is a retrospective scoring demonstration rather than a live production inference system.
+
 These segments describe purchase propensity; they do not measure the incremental impact of contacting or incentivizing customers.
 
 ## Feature Importance
@@ -501,7 +505,7 @@ The test suite covers temporal split boundaries, non-overlapping prediction wind
 
 ## Generated Outputs
 
-The benchmark and holdout evaluation scripts save their aggregate results in:
+The benchmark and holdout evaluation scripts save performance metrics, diagnostic tables, and household-level propensity scores in:
 
 `reports/tables/`
 

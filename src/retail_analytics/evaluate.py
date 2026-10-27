@@ -224,7 +224,38 @@ def main() -> None:
         index=False,
     )
 
-        # Household-cluster bootstrap uncertainty
+    # Export ranked household scores for the latest holdout day
+    latest_day = scored["as_of_day"].max()
+
+    latest_scores = (
+        scored.loc[
+            scored["as_of_day"].eq(latest_day),
+            [
+                "household_key",
+                "as_of_day",
+                "predicted_probability",
+                "score_decile",
+            ],
+        ]
+        .sort_values(
+            "predicted_probability",
+            ascending=False,
+        )
+        .reset_index(drop=True)
+    )
+
+    latest_scores.insert(
+        0,
+        "rank",
+        range(1, len(latest_scores) + 1),
+    )
+
+    latest_scores.to_csv(
+        REPORT_DIR / "holdout_latest_day_scores.csv",
+        index=False,
+    )
+
+    # Household-cluster bootstrap uncertainty
     uncertainty_report = household_bootstrap_precision(
         test,
         probabilities,
