@@ -153,4 +153,5 @@ def test_all_horizon_evaluation_runs_on_synthetic_contract(tmp_path, monkeypatch
     assert result["selected_horizon_days"] in HORIZONS
     assert result["holdout_days"] == [600, 630, 660]
     assert (tmp_path / "retention_holdout.csv").exists()
+    assert (tmp_path / "retention_holdout_by_date.csv").exists()
     assert (tmp_path / "retention_profit_scenarios.csv").exists()

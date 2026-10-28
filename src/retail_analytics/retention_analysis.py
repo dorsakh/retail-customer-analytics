@@ -337,7 +337,7 @@ def run_evaluation(data: pd.DataFrame, *, horizon: int | None = None,
             **stats,
             "model_trained_through_day": max(VALIDATION_DAYS),
         })
-    pd.DataFrame(replay).to_csv(REPORTS / "retention_replay.csv", index=False)
+    pd.DataFrame(replay).to_csv(REPORTS / "retention_holdout_by_date.csv", index=False)
     from .retention_data import coverage_summary
     coverage_summary(data).to_csv(REPORTS / "retention_coverage.csv", index=False)
     decision = {

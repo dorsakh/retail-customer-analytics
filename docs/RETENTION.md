@@ -20,7 +20,7 @@ The selected model identifies **529 eventual lapse instances** at this capacity 
 
 The validation-only LightGBM ablation was **49.09% Precision@20% with 13 behavioral encoded inputs** versus **51.04% with the full 51 encoded inputs**. Adding cadence alone lowered precision; other omissions had unequal effects. These results do not establish that every feature family improves the selected LR. See `reports/tables/retention_ablation.csv` for each combination.
 
-The three-date replay had prediction PSI values of approximately **0.0048–0.0113**, while day-660 mean predicted lapse risk (**16.95%**) was below observed lapse (**19.96%**). Low distribution PSI therefore does **not** establish good calibration. The economics sheet uses assumed margin and incremental response, not observed treatment effects; the **13.33%** break-even is `CAD 2 / CAD 15`.
+Across the three fixed holdout dates, prediction PSI values were approximately **0.0048–0.0113**, while day-660 mean predicted lapse risk (**16.95%**) was below observed lapse (**19.96%**). Low distribution PSI therefore does **not** establish good calibration. The economics sheet uses assumed margin and incremental response, not observed treatment effects; the **13.33%** break-even is `CAD 2 / CAD 15`.
 
 ## One-time migration and run
 
@@ -78,7 +78,7 @@ python -m uvicorn retail_analytics.api:app --host 127.0.0.1 --port 8001
 
 Open `http://127.0.0.1:8001/`, select **Retention Lab**. The v2 research and scored roster only appear after `retention run` finishes; the original v1 views work independently. If the project uses a custom `RETAIL_DATABASE_URL`, export it before running the SQL/model commands and adapt `psql` accordingly. **Do not create or replace your existing database.**
 
-`run` performs these operations as a single repeatable update *once*: create historical feature snapshots and matured future labels, compare 7/14/28-day outcomes on validation, perform validation feature-family ablations, choose between logistic regression and LightGBM, fit a separate development-only holdout estimator, compare multiple baselines on the same holdout, bootstrap entire households, generate assumption-only economics and chronological replay, refit a final versioned model on available labeled history, then score the day-711 cohort. The script refuses to overwrite an existing `lapse_v2` model artifact.
+`run` performs these operations as a single repeatable update *once*: create historical feature snapshots and matured future labels, compare 7/14/28-day outcomes on validation, perform validation feature-family ablations, choose between logistic regression and LightGBM, fit a separate development-only holdout estimator, compare multiple baselines on the same holdout, bootstrap entire households, generate assumption-only economics and a per-date holdout report, refit a final versioned model on available labeled history, then score the day-711 cohort. The script refuses to overwrite an existing `lapse_v2` model artifact.
 
 If rerunning research without replacing the production artifact:
 
@@ -86,11 +86,6 @@ If rerunning research without replacing the production artifact:
 python -m retail_analytics.retention prepare
 python -m retail_analytics.retention evaluate --horizon auto
 python -m retail_analytics.retention score --day 711
-
-# Optional deeper engineering demo: reproduce every historical day 600..683,
-# with frozen development model, rolling inputs and mature outcome labels.
-# This performs 84 additional SQL feature queries and may take a while.
-python -m retail_analytics.retention replay --start 600 --end 683 --step 1
 ```
 
 For a predeclared 14-day horizon, replace `--horizon auto` with `--horizon 14` *before* inspecting holdout results. An automatic candidate is chosen **using validation only**: among horizons with 10–75% validation lapse prevalence, maximize the observed lift at 20% capacity. This is a transparent heuristic, not evidence of an economically optimal horizon.
@@ -139,8 +134,7 @@ Reports are stored in `reports/tables/retention_*.csv` and `retention_decision.j
 | `retention_holdout.csv` | Fixed chronological holdout performance for all four baselines |
 | `retention_paired_bootstrap.csv` | Paired whole-household Precision@20% intervals, models held fixed |
 | `retention_coverage.csv` | Count of all known households by date and lifecycle segment |
-| `retention_replay.csv` | Predicted versus observed risk and PSI over historical holdout days |
-| `retention_replay_daily.csv` | Optional 84-day historical feature/label replay (`replay` command) |
+| `retention_holdout_by_date.csv` | Three fixed holdout dates (600, 630, 660): predicted versus observed lapse and PSI; **not a daily replay** |
 | `retention_profit_scenarios.csv` | **Explicitly hypothetical** offer-cost/margin/incremental-response sensitivity |
 
 Profit scenarios assume a constant incremental response probability for all contacted customers, a hypothetical gross contribution per incremental purchase, and an assumed per-contact marketing cost. The break-even threshold is:
@@ -149,11 +143,9 @@ Profit scenarios assume a constant incremental response probability for all cont
 
 **Neither uplift nor measured marketing profit is inferable from repurchase/lapse predictions alone.** A proper customer-targeting ROI estimate would require a randomized no-offer holdout or defensible treatment-effect identification. Under uniform assumed uplift, profit is monotonic in number contacted; **the code does not manufacture an "optimal" capacity**.
 
-## Historical replay
+## Holdout by observation date
 
-The replay uses three genuinely different historical feature snapshots (days 600, 630, 660) with a model fitted no later than day 570. It measures observed lapse after each fully matured interval and prediction-distribution PSI relative to validation. This demonstrates time-varying behavior without using the final model trained on its own later labels. It is an **offline replay**, not online data ingestion, production shadow serving, or a randomized campaign.
-
-The optional `replay --step 1` command extends this to **84 successive historical daily batches** (600 through 683), applying the same frozen model and time-varying point-in-time SQL features for every day. It writes `retention_replay_daily.csv`; the Retention Lab prefers this dense timeline when the file exists. Days after 683 are excluded by default to support even the 28-day target without future-label censoring. This does not retrain the model or leak observed holdout outcomes into inference.
+The committed report contains **three holdout dates**, not 84 daily batches. The same development-only estimator, fitted through day 570, was scored on point-in-time features from days 600, 630, and 660. The report shows observed lapse after each fully matured interval, mean predicted risk, and prediction-distribution PSI relative to validation. The three dates are useful for comparison but are **not evidence of continuous daily monitoring**, production shadow serving, or a randomized campaign. A separate daily-replay command exists in the code, but its output has **not** been run or committed here.
 
 ## Artifact/version and deployment boundaries
 
