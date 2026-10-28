@@ -147,6 +147,12 @@ Profit scenarios assume a constant incremental response probability for all cont
 
 The committed report contains **three holdout dates**, not 84 daily batches. The same development-only estimator, fitted through day 570, was scored on point-in-time features from days 600, 630, and 660. The report shows observed lapse after each fully matured interval, mean predicted risk, and prediction-distribution PSI relative to validation. The three dates are useful for comparison but are **not evidence of continuous daily monitoring**, production shadow serving, or a randomized campaign. A separate daily-replay command exists in the code, but its output has **not** been run or committed here.
 
+## Do 14-day lapsers return?
+
+The lapse target records **no purchase during days 1–14 after the prediction date**; it does not label permanent churn. `scripts/assess_lapse_return.py` measures how often eligible household-date lapsers buy again within **30 or 60 days after that initial 14-day window**. It includes only snapshots with a complete 14 + 60 days of future observation (through day 711, the latest included snapshot is day 630) to avoid classifying right-censored households as non-returners. Repeat appearances of the same household across snapshot dates are separate observations; the report also counts distinct households.
+
+After preparing the local snapshot cache and database, run `python scripts/assess_lapse_return.py` to generate `reports/tables/retention_lapse_return.csv`. **This report is not included in the repository until executed on the original data; no post-lapse return rate is claimed yet.** The median return time is calculated among returns observed within the fully matured 60-day follow-up window.
+
 ## Artifact/version and deployment boundaries
 
 - `artifacts/models/v1/` remains unchanged; its 7-day outcome is *purchase*, not lapse.
