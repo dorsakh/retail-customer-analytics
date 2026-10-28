@@ -8,6 +8,7 @@ from retail_analytics.retention import make_scoring_records
 from retail_analytics.retention_analysis import (
     bootstrap_model_differences,
     choose_horizon,
+    holdout_heuristic_scores,
     run_evaluation,
     scenario_table,
     top_capacity_stats,
@@ -95,6 +96,24 @@ def test_horizon_rule_never_reads_holdout():
     assert choose_horizon(candidates) == 14
 
 
+def test_frequency_baselines_rank_lower_basket_counts_as_higher_risk():
+    holdout = pd.DataFrame({
+        "as_of_day": [600, 600, 630, 630],
+        "recency_days": [2, 15, 15, 2],
+        "baskets_90d": [10, 3, 10, 3],
+        "overdue_ratio": [1.0, 3.0, 3.0, 1.0],
+    })
+    scores = holdout_heuristic_scores(holdout)
+    assert set(scores) == {
+        "Recency", "Low frequency", "Recency + low frequency",
+        "Recency / visit interval",
+    }
+    assert scores["Low frequency"].tolist() == [-10.0, -3.0, -10.0, -3.0]
+    # Ties in the combined ranking are resolved independently by date.
+    assert scores["Recency + low frequency"][1] > scores["Recency + low frequency"][0]
+    assert scores["Recency + low frequency"][3] == scores["Recency + low frequency"][2]
+
+
 def test_economics_are_explicitly_assumed_not_observed_roi():
     data = pd.DataFrame({
         "as_of_day": [600] * 5,
@@ -153,5 +172,7 @@ def test_all_horizon_evaluation_runs_on_synthetic_contract(tmp_path, monkeypatch
     assert result["selected_horizon_days"] in HORIZONS
     assert result["holdout_days"] == [600, 630, 660]
     assert (tmp_path / "retention_holdout.csv").exists()
+    holdout_models = set(pd.read_csv(tmp_path / "retention_holdout.csv")["model"])
+    assert {"Low frequency", "Recency + low frequency"} <= holdout_models
     assert (tmp_path / "retention_holdout_by_date.csv").exists()
     assert (tmp_path / "retention_profit_scenarios.csv").exists()

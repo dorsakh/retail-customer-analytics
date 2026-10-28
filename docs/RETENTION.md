@@ -122,7 +122,9 @@ The ablation output starts from existing behavior, adds cadence, and separately 
 
 ## Evaluation and economics
 
-The evaluation includes **recency-only**, **overdue-ratio**, **logistic regression**, and **LightGBM** on identical holdout examples. Model selection uses validation Precision@20% and prefers logistic regression unless LightGBM's gain reaches 1.5 percentage points. The fit used for holdout is frozen after day 570; a later final refit is clearly distinguished.
+The evaluation code includes **recency-only**, **low-frequency-only**, **recency + low-frequency ranks** (equal-weight, ranked within each date), **overdue-ratio**, **logistic regression**, and **LightGBM** on identical holdout examples. Model selection uses validation Precision@20% and prefers logistic regression unless LightGBM's gain reaches 1.5 percentage points. The fit used for holdout is frozen after day 570; a later final refit is clearly distinguished. **The newly added frequency results require re-running `evaluate` on the local snapshot cache; they must not be inferred from the previously committed four-row holdout CSV.**
+
+The existing **recency / visit interval** heuristic performed poorly (holdout AUC **0.561**, Precision@20% **25.2%**). A short typical interval can produce a high ratio from a small absolute gap, while the 14-day lapse outcome is strongly affected by how often a household purchases. This is an observational explanation of a failed heuristic, not evidence that cadence carries no useful predictive signal.
 
 Reports are stored in `reports/tables/retention_*.csv` and `retention_decision.json`:
 
@@ -131,7 +133,7 @@ Reports are stored in `reports/tables/retention_*.csv` and `retention_decision.j
 | `retention_horizons.csv` | Validation prevalence, PR-AUC, AUC, calibration and shortlist lift per horizon |
 | `retention_model_selection.csv` | LR versus LightGBM on validation |
 | `retention_ablation.csv` | Family-wise model comparisons on validation |
-| `retention_holdout.csv` | Fixed chronological holdout performance for all four baselines |
+| `retention_holdout.csv` | Fixed chronological holdout performance (four previously committed methods; six after re-evaluation with the added frequency heuristics) |
 | `retention_paired_bootstrap.csv` | Paired whole-household Precision@20% intervals, models held fixed |
 | `retention_coverage.csv` | Count of all known households by date and lifecycle segment |
 | `retention_holdout_by_date.csv` | Three fixed holdout dates (600, 630, 660): predicted versus observed lapse and PSI; **not a daily replay** |
