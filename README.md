@@ -45,7 +45,7 @@ The model identified **529 observed lapse instances** in the shortlist versus **
 
 The **14-day horizon** was also selected on validation only: 7/14/28-day comparisons used Lift@20% among horizons with 10–75% lapse prevalence. The 28-day outcome fell below that prevalence criterion. Six feature families—behavior, purchase cadence, product mix, promotions, demographics, and seasonality—were tested; feature-family ablation used **LightGBM on validation**.
 
-**Offer economics:** With *assumed* CAD $2 cost per contact and CAD $15 margin per incremental purchase, break-even requires **13.3% incremental response** (`2 / 15`). This is a scenario threshold, **not a measured response rate, causal uplift, or realized profit**. Historical replay checks risk, outcomes, and distribution drift on three later dates.
+**Offer economics:** With *assumed* CAD $2 cost per contact and CAD $15 margin per incremental purchase, break-even requires **13.3% incremental response** (`2 / 15`). This is a scenario threshold, **not a measured response rate, causal uplift, or realized profit**. The three holdout dates also report predicted-versus-observed lapse and distribution shift.
 
 ## Architecture
 
@@ -59,7 +59,7 @@ flowchart TD
     F --> G["Day-711 batch scoring · 2,500-household roster"]
     G --> H["PostgreSQL retention scores · FastAPI"]
     H --> I["React · Retention Lab and Inspect"]
-    E --> J["Offline replay and profit scenarios"]
+    E --> J["Holdout by date and profit scenarios"]
     J --> I
     B --> K["Separate v1 · 7-day repurchase LightGBM"]
     K --> I
@@ -69,8 +69,8 @@ flowchart TD
 
 | Household-level decision support | Evidence and model validation |
 |---|---|
-| [![At-risk household profile with observed history and 14-day lapse probability](docs/assets/retention_inspect.png)](docs/assets/retention_inspect.png) | [![Validation horizon comparison, holdout model baselines, ablation, and replay](docs/assets/retention_evidence.png)](docs/assets/retention_evidence.png) |
-| **Inspect:** risk, recent purchases, typical visit interval, and segment rationale. | **Evidence:** why 14 days and why LR; feature-family ablations and historical replay. |
+| [![At-risk household profile with observed history and 14-day lapse probability](docs/assets/retention_inspect.png)](docs/assets/retention_inspect.png) | [![Validation horizon comparison, holdout model baselines, ablation, and per-date results](docs/assets/retention_evidence.png)](docs/assets/retention_evidence.png) |
+| **Inspect:** risk, recent purchases, typical visit interval, and segment rationale. | **Evidence:** why 14 days and why LR; feature-family ablations and holdout performance by date. |
 
 *Click either image to view the details at full resolution.*
 
@@ -98,7 +98,7 @@ The campaign panel shows sensitivity to a **hypothetical** incremental response 
 | **Cohort policy** | Score repeat shoppers with ≥3 baskets in 90 days and ≤30 days since last visit; retain inactive, dormant, and limited-history households with explicit null risk |
 | **Temporal validation** | Train through day 510; validation days 540/570; untouched holdout days 600/630/660; frozen estimator before holdout; later independent final refit |
 | **Model governance** | Compare recency/overdue heuristics, Logistic Regression, and LightGBM; fixed 20% shortlist capacity; paired **500-replicate household-cluster bootstrap** |
-| **Operational implementation** | Versioned model artifact, PostgreSQL batch scores, FastAPI endpoints, React/TypeScript inspection, offline replay/PSI, Docker Compose, Python/React CI |
+| **Operational implementation** | Versioned model artifact, PostgreSQL batch scores, FastAPI endpoints, React/TypeScript inspection, three-date holdout/PSI, Docker Compose, Python/React CI |
 
 <details>
 <summary><strong>Open the methodological detail: horizon choice, feature ablations, uncertainty, and limitations</strong></summary>
@@ -106,7 +106,7 @@ The campaign panel shows sensitivity to a **hypothetical** incremental response 
 - **Horizon:** validation lapse prevalence was 35.4% (7d), 19.1% (14d), and 8.6% (28d). The 28-day horizon had higher lift but failed the predeclared ≥10% prevalence gate; the 14-day choice is operationally motivated, **not proven financially optimal**.
 - **Model choice:** LightGBM improved validation Precision@20% by only 0.26 pp over LR, below the preset 1.5-pp complexity threshold. On holdout, its slight precision difference was not distinguishable under the paired household bootstrap.
 - **Feature ablation:** behavioral-only versus six families (cadence, products, promotions, demographics, seasonality) used **LightGBM on validation**. Some families added little or no benefit. See [retention_ablation.csv](reports/tables/retention_ablation.csv).
-- **Replay:** a frozen development model evaluated historical days 600/630/660 with matured outcomes and PSI. This is a retrospective data replay, not production streaming or an independent new-customer cohort.
+- **Holdout by date:** a frozen development model was evaluated on three dates (600/630/660) with matured outcomes and PSI. This is **not** a daily replay, production monitoring, or an independent new-customer cohort.
 - **Economics:** a 13.3% break-even threshold follows from *assumed* $2 contact cost ÷ $15 incremental contribution margin. This dataset does **not** identify who would buy *because of* an offer.
 - **Reproduction:** source dataset is not bundled. See [RETENTION.md](docs/RETENTION.md) for the SQL/data pipeline, model contract, artifact/version rules, command sequence, evaluation design, and [aggregate outputs](reports/tables).
 
