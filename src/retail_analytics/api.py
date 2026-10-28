@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -300,6 +301,120 @@ def get_customer_prediction(
         )
 
     return results[0]
+
+
+# --------------------------------------------------
+# Retention research v2 (separate from seven-day propensity model v1)
+# --------------------------------------------------
+
+RETENTION_REPORTS = Path(
+    os.getenv("RETAIL_PROJECT_ROOT", Path(__file__).resolve().parents[2])
+) / "reports" / "tables"
+
+
+@app.get("/retention/overview")
+def retention_overview():
+    """Latest scored roster, including dormant/inactive known households."""
+    rows = fetch_rows("""
+        SELECT as_of_day, model_version, horizon_days, segment,
+               COUNT(*) AS households,
+               AVG(lapse_probability) AS mean_lapse_probability
+        FROM analytics.retention_scores
+        WHERE model_version = 'lapse_v2'
+          AND as_of_day = (
+              SELECT MAX(as_of_day) FROM analytics.retention_scores
+              WHERE model_version = 'lapse_v2'
+          )
+        GROUP BY as_of_day, model_version, horizon_days, segment
+        ORDER BY segment
+    """)
+    if not rows:
+        raise HTTPException(
+            status_code=404,
+            detail="Retention analysis has not been run yet; see docs/RETENTION.md",
+        )
+    return {
+        "as_of_day": rows[0]["as_of_day"],
+        "model_version": rows[0]["model_version"],
+        "horizon_days": rows[0]["horizon_days"],
+        "total_known_households": sum(row["households"] for row in rows),
+        "segments": rows,
+        "interpretation": "Lapse risk, not coupon response or causal uplift.",
+    }
+
+
+@app.get("/retention/directory")
+def retention_directory(
+    q: str | None = Query(None, min_length=1, max_length=32),
+    segment: Literal[
+        "all", "at_risk", "active", "inactive", "dormant", "limited_history"
+    ] = "all",
+    sort: Literal["risk", "recency", "household"] = "risk",
+    offset: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+):
+    order = {
+        "risk": "risk_rank ASC NULLS LAST, household_key ASC",
+        "recency": "recency_days DESC, household_key ASC",
+        "household": "household_key ASC",
+    }[sort]
+    params = {"term": q or "", "segment": segment, "offset": offset, "limit": limit}
+    predicate = """
+        model_version = 'lapse_v2'
+        AND as_of_day = (
+            SELECT MAX(as_of_day) FROM analytics.retention_scores
+            WHERE model_version = 'lapse_v2'
+        )
+        AND (:term = '' OR POSITION(:term IN household_key) > 0)
+        AND (:segment = 'all' OR segment = :segment)
+    """
+    total = fetch_rows(
+        f"SELECT COUNT(*) AS total FROM analytics.retention_scores WHERE {predicate}",
+        params,
+    )[0]["total"]
+    rows = fetch_rows(f"""
+        SELECT household_key, as_of_day, horizon_days, segment,
+               lapse_probability, risk_rank, recency_days, baskets_90d,
+               typical_visit_gap_90d, overdue_ratio, sales_90d
+        FROM analytics.retention_scores WHERE {predicate}
+        ORDER BY {order} LIMIT :limit OFFSET :offset
+    """, params)
+    return {"total": total, "offset": offset, "limit": limit, "items": rows}
+
+
+@app.get("/retention/research")
+def retention_research():
+    """Saved aggregate reports; never load untracked household-level CSVs."""
+    files = {
+        "horizons": "retention_horizons.csv",
+        "model_selection": "retention_model_selection.csv",
+        "holdout": "retention_holdout.csv",
+        "bootstrap": "retention_paired_bootstrap.csv",
+        "ablation": "retention_ablation.csv",
+        "scenarios": "retention_profit_scenarios.csv",
+        "replay": "retention_replay.csv",
+        "coverage": "retention_coverage.csv",
+    }
+    decision_path = RETENTION_REPORTS / "retention_decision.json"
+    if not decision_path.is_file():
+        raise HTTPException(status_code=404, detail="Retention reports not built yet")
+    result = {"decision": json.loads(decision_path.read_text())}
+    for key, filename in files.items():
+        # Prefer optional high-resolution daily replay when it has been run.
+        path = (
+            RETENTION_REPORTS / "retention_replay_daily.csv"
+            if key == "replay" and (RETENTION_REPORTS / "retention_replay_daily.csv").is_file()
+            else RETENTION_REPORTS / filename
+        )
+        if not path.is_file():
+            raise HTTPException(status_code=503, detail=f"Missing {filename} report")
+        # DataFrame's JSON serializer emits `null` for missing metrics.
+        result[key] = json.loads(pd.read_csv(path).to_json(orient="records"))
+    result["disclaimer"] = (
+        "Scenario margins, offer costs, and response increments are ASSUMPTIONS; "
+        "no observed causal campaign effect or profit is measured."
+    )
+    return result
 
 
 # --------------------------------------------------

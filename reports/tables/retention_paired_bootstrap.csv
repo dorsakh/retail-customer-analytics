@@ -1,0 +1,4 @@
+comparison,precision_gap_pp,ci_low_pp,ci_high_pp,bootstrap_households,replicates
+Recency minus Logistic regression,-8.426483233018061,-11.801223665848863,-5.957943715964462,2163,500
+Recency / visit interval minus Logistic regression,-20.29234737747206,-23.902913377648527,-17.48832437764997,2163,500
+LightGBM minus Logistic regression,-0.17196904557180148,-2.076407945061355,0.7332573944162659,2163,500

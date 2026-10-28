@@ -2,6 +2,11 @@ services:
   db:
     image: postgres:18
 
+    # Host-side retention research accesses this same persisted database.
+    # Bind on loopback only; the container API still uses db:5432.
+    ports:
+      - "127.0.0.1:55432:5432"
+
     environment:
       POSTGRES_DB: retail_analytics
       POSTGRES_USER: retail

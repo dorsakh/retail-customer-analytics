@@ -2,6 +2,8 @@
 
 The [README](../README.md) summarizes the system. This page covers reproducibility and operational commands. The original dunnhumby data is intentionally excluded from Git.
 
+**New optional research track:** For customer lapse (v2), lifecycle coverage, horizon selection, and the Retention Lab page, see [RETENTION.md](RETENTION.md). It uses the same existing PostgreSQL database but does not modify the purchase propensity `v1` model.
+
 ## Requirements
 
 - Python 3.11+, Node.js 24 and npm for the React build; PostgreSQL and `psql` (project tested with PostgreSQL 18).
