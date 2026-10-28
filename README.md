@@ -1,4 +1,4 @@
-# Behind the Basket — Retail Retention Analytics
+# Behind the Basket: Retail Retention Analytics
 
 **Problem:** Which repeat shoppers are likely to make **no purchase in the next 14 days**?
 
