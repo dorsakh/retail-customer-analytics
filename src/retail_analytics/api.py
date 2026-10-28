@@ -392,7 +392,7 @@ def retention_research():
         "bootstrap": "retention_paired_bootstrap.csv",
         "ablation": "retention_ablation.csv",
         "scenarios": "retention_profit_scenarios.csv",
-        "replay": "retention_replay.csv",
+        "replay": "retention_holdout_by_date.csv",
         "coverage": "retention_coverage.csv",
     }
     decision_path = RETENTION_REPORTS / "retention_decision.json"

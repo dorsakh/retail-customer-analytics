@@ -11,16 +11,19 @@ The **untouched chronological holdout** contains **5,808 household-date observat
 | Frozen holdout model | ROC-AUC | Average precision | Brier score | Precision@20% | Lift@20% |
 |---|---:|---:|---:|---:|---:|
 | Recency rule | 0.6761 | 0.3222 | — | 37.06% | 1.94× |
+| Low frequency | 0.7913 | 0.4201 | — | 43.94% | 2.29× |
+| Recency + low frequency | 0.7692 | 0.4060 | — | 41.70% | 2.18× |
+| Recency / visit interval | 0.5609 | 0.2355 | — | 25.19% | 1.32× |
 | **Logistic Regression (selected)** | **0.8022** | **0.4315** | **0.1281** | **45.49%** | **2.38×** |
 | LightGBM | 0.8042 | 0.4310 | 0.1273 | 45.31% | 2.37× |
 
-The selected model identifies **529 eventual lapse instances** at this capacity versus **431 for recency**. The **+8.43-pp** Precision@20% improvement has a paired, whole-household **500-replicate bootstrap 95% CI of +5.96 to +11.80 pp**. This interval reflects held-fixed predictions with household resampling, not model-training or deployment uncertainty. LightGBM–LR Precision@20% differed by about −0.17 pp on holdout (paired CI spanning zero), supporting the validation-defined choice of the simpler LR.
+The selected model identifies **529 observed lapse instances** at this capacity versus **511 for low frequency**, **485 for the combined ranks**, and **431 for recency**. Against recency, the LR gain was **+8.43 pp** (paired whole-household, 500-replicate bootstrap 95% CI **+5.96 to +11.80 pp**). The more demanding comparison with low frequency was only **+1.55 pp** (CI **−0.26 to +3.63 pp**): **the interval crosses zero**, so incremental shortlist precision beyond frequency alone is not established. Against the combined ranks, LR gained **+3.78 pp** (CI **+1.90 to +6.48 pp**). These intervals resample entire households with fixed predictions; they do not include model-training or deployment uncertainty. LightGBM–LR differed by about −0.17 pp on holdout, also inconclusively.
 
 **Selection was performed without consulting this holdout.** Validation lapse prevalences were 35.43% (7d), 19.13% (14d), and 8.55% (28d). The 28-day option had the largest measured lift (3.13×) but did not satisfy the predeclared ≥10% prevalence requirement. Hence **14 days** was chosen within the eligible horizon set; that rule is not proof of an economically optimal window. Validation Precision@20% was **50.78% for LR** versus **51.04% for LightGBM**, below the preset 1.5-pp hurdle for choosing the more complex model.
 
 The validation-only LightGBM ablation was **49.09% Precision@20% with 13 behavioral encoded inputs** versus **51.04% with the full 51 encoded inputs**. Adding cadence alone lowered precision; other omissions had unequal effects. These results do not establish that every feature family improves the selected LR. See `reports/tables/retention_ablation.csv` for each combination.
 
-The three-date replay had prediction PSI values of approximately **0.0048–0.0113**, while day-660 mean predicted lapse risk (**16.95%**) was below observed lapse (**19.96%**). Low distribution PSI therefore does **not** establish good calibration. The economics sheet uses assumed margin and incremental response, not observed treatment effects; the **13.33%** break-even is `CAD 2 / CAD 15`.
+Across the three fixed holdout dates, prediction PSI values were approximately **0.0048–0.0113**, while day-660 mean predicted lapse risk (**16.95%**) was below observed lapse (**19.96%**). Low distribution PSI therefore does **not** establish good calibration. The economics sheet uses assumed margin and incremental response, not observed treatment effects; the **13.33%** break-even is `CAD 2 / CAD 15`.
 
 ## One-time migration and run
 
@@ -78,7 +81,7 @@ python -m uvicorn retail_analytics.api:app --host 127.0.0.1 --port 8001
 
 Open `http://127.0.0.1:8001/`, select **Retention Lab**. The v2 research and scored roster only appear after `retention run` finishes; the original v1 views work independently. If the project uses a custom `RETAIL_DATABASE_URL`, export it before running the SQL/model commands and adapt `psql` accordingly. **Do not create or replace your existing database.**
 
-`run` performs these operations as a single repeatable update *once*: create historical feature snapshots and matured future labels, compare 7/14/28-day outcomes on validation, perform validation feature-family ablations, choose between logistic regression and LightGBM, fit a separate development-only holdout estimator, compare multiple baselines on the same holdout, bootstrap entire households, generate assumption-only economics and chronological replay, refit a final versioned model on available labeled history, then score the day-711 cohort. The script refuses to overwrite an existing `lapse_v2` model artifact.
+`run` performs these operations as a single repeatable update *once*: create historical feature snapshots and matured future labels, compare 7/14/28-day outcomes on validation, perform validation feature-family ablations, choose between logistic regression and LightGBM, fit a separate development-only holdout estimator, compare multiple baselines on the same holdout, bootstrap entire households, generate assumption-only economics and a per-date holdout report, refit a final versioned model on available labeled history, then score the day-711 cohort. The script refuses to overwrite an existing `lapse_v2` model artifact.
 
 If rerunning research without replacing the production artifact:
 
@@ -86,11 +89,6 @@ If rerunning research without replacing the production artifact:
 python -m retail_analytics.retention prepare
 python -m retail_analytics.retention evaluate --horizon auto
 python -m retail_analytics.retention score --day 711
-
-# Optional deeper engineering demo: reproduce every historical day 600..683,
-# with frozen development model, rolling inputs and mature outcome labels.
-# This performs 84 additional SQL feature queries and may take a while.
-python -m retail_analytics.retention replay --start 600 --end 683 --step 1
 ```
 
 For a predeclared 14-day horizon, replace `--horizon auto` with `--horizon 14` *before* inspecting holdout results. An automatic candidate is chosen **using validation only**: among horizons with 10–75% validation lapse prevalence, maximize the observed lift at 20% capacity. This is a transparent heuristic, not evidence of an economically optimal horizon.
@@ -127,7 +125,9 @@ The ablation output starts from existing behavior, adds cadence, and separately 
 
 ## Evaluation and economics
 
-The evaluation includes **recency-only**, **overdue-ratio**, **logistic regression**, and **LightGBM** on identical holdout examples. Model selection uses validation Precision@20% and prefers logistic regression unless LightGBM's gain reaches 1.5 percentage points. The fit used for holdout is frozen after day 570; a later final refit is clearly distinguished.
+The evaluation includes **recency-only**, **low-frequency-only**, **recency + low-frequency ranks** (equal-weight, ranked within each date), **overdue-ratio**, **logistic regression**, and **LightGBM** on identical holdout examples. Model selection uses validation Precision@20% and prefers logistic regression unless LightGBM's gain reaches 1.5 percentage points. The fit used for holdout is frozen after day 570; a later final refit is clearly distinguished. All six rows above are from the re-executed 14-day holdout evaluation.
+
+The existing **recency / visit interval** heuristic performed poorly (holdout AUC **0.561**, Precision@20% **25.2%**). A short typical interval can produce a high ratio from a small absolute gap, while the 14-day lapse outcome is strongly affected by how often a household purchases. This is an observational explanation of a failed heuristic, not evidence that cadence carries no useful predictive signal.
 
 Reports are stored in `reports/tables/retention_*.csv` and `retention_decision.json`:
 
@@ -136,11 +136,11 @@ Reports are stored in `reports/tables/retention_*.csv` and `retention_decision.j
 | `retention_horizons.csv` | Validation prevalence, PR-AUC, AUC, calibration and shortlist lift per horizon |
 | `retention_model_selection.csv` | LR versus LightGBM on validation |
 | `retention_ablation.csv` | Family-wise model comparisons on validation |
-| `retention_holdout.csv` | Fixed chronological holdout performance for all four baselines |
+| `retention_holdout.csv` | Fixed chronological holdout performance for four heuristics and two classifiers |
 | `retention_paired_bootstrap.csv` | Paired whole-household Precision@20% intervals, models held fixed |
 | `retention_coverage.csv` | Count of all known households by date and lifecycle segment |
-| `retention_replay.csv` | Predicted versus observed risk and PSI over historical holdout days |
-| `retention_replay_daily.csv` | Optional 84-day historical feature/label replay (`replay` command) |
+| `retention_holdout_by_date.csv` | Three fixed holdout dates (600, 630, 660): predicted versus observed lapse and PSI; **not a daily replay** |
+| `retention_lapse_return.csv` | Censoring-safe 30-/60-day return rates after an observed 14-day lapse |
 | `retention_profit_scenarios.csv` | **Explicitly hypothetical** offer-cost/margin/incremental-response sensitivity |
 
 Profit scenarios assume a constant incremental response probability for all contacted customers, a hypothetical gross contribution per incremental purchase, and an assumed per-contact marketing cost. The break-even threshold is:
@@ -149,11 +149,15 @@ Profit scenarios assume a constant incremental response probability for all cont
 
 **Neither uplift nor measured marketing profit is inferable from repurchase/lapse predictions alone.** A proper customer-targeting ROI estimate would require a randomized no-offer holdout or defensible treatment-effect identification. Under uniform assumed uplift, profit is monotonic in number contacted; **the code does not manufacture an "optimal" capacity**.
 
-## Historical replay
+## Holdout by observation date
 
-The replay uses three genuinely different historical feature snapshots (days 600, 630, 660) with a model fitted no later than day 570. It measures observed lapse after each fully matured interval and prediction-distribution PSI relative to validation. This demonstrates time-varying behavior without using the final model trained on its own later labels. It is an **offline replay**, not online data ingestion, production shadow serving, or a randomized campaign.
+The committed report contains **three holdout dates**, not 84 daily batches. The same development-only estimator, fitted through day 570, was scored on point-in-time features from days 600, 630, and 660. The report shows observed lapse after each fully matured interval, mean predicted risk, and prediction-distribution PSI relative to validation. The three dates are useful for comparison but are **not evidence of continuous daily monitoring**, production shadow serving, or a randomized campaign. A separate daily-replay command exists in the code, but its output has **not** been run or committed here.
 
-The optional `replay --step 1` command extends this to **84 successive historical daily batches** (600 through 683), applying the same frozen model and time-varying point-in-time SQL features for every day. It writes `retention_replay_daily.csv`; the Retention Lab prefers this dense timeline when the file exists. Days after 683 are excluded by default to support even the 28-day target without future-label censoring. This does not retrain the model or leak observed holdout outcomes into inference.
+## Do 14-day lapsers return?
+
+The lapse target records **no purchase during days 1–14 after the prediction date**; it does not label permanent churn. `scripts/assess_lapse_return.py` measures how often eligible household-date lapsers buy again within **30 or 60 days after that initial 14-day window**. It includes only snapshots with a complete 14 + 60 days of future observation (through day 711, the latest included snapshot is day 630) to avoid classifying right-censored households as non-returners. Repeat appearances of the same household across snapshot dates are separate observations; the report also counts distinct households.
+
+The completed local-data audit contains **5,944 eligible lapse observations from 1,826 distinct households**. **76.63%** returned within 30 days after the 14-day lapse period; **89.23%** within 60 days; **10.77%** did not return within that fully observed 60-day window. The median post-lapse return time among those returning within 60 days was **10 days**. These are observation-level fractions: repeated household snapshots are not independent unique customers, and the analysis measures natural return, not response to an offer. The CSV is in `reports/tables/retention_lapse_return.csv`; reproduce it locally with `python scripts/assess_lapse_return.py`.
 
 ## Artifact/version and deployment boundaries
 

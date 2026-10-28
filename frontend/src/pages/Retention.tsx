@@ -569,11 +569,20 @@ export default function Retention() {
             </div>
           </div>
           <div className="retention-research-card">
-            <div className="eyebrow">TEMPORAL REPLAY · HOLDOUT</div>
-            <h3>Watch risk evolve</h3>
+            <div className="eyebrow">
+              {research.replay.length > 3
+                ? "DAILY HISTORICAL REPLAY"
+                : "HOLDOUT · THREE DATES"}
+            </div>
+            <h3>
+              {research.replay.length > 3
+                ? "Risk across daily batches"
+                : "Risk across holdout dates"}
+            </h3>
             <p>
-              Frozen development-only model, scored on successive historical
-              days after outcomes mature.
+              {research.replay.length > 3
+                ? "Frozen development-only model, evaluated on daily historical snapshots."
+                : "Frozen development-only model, evaluated at three fixed dates with matured outcomes. Not a daily replay."}
             </p>
             <div className="retention-chart">
               <ResponsiveContainer width="100%" height={220}>
