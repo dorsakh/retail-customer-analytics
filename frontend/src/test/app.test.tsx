@@ -37,7 +37,9 @@ vi.mock("recharts", () => ({
   YAxis: () => null,
   Tooltip: () => null,
   Bar: () => null,
-  LineChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  LineChart: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
   Line: () => null,
   Legend: () => null,
 }));
@@ -175,18 +177,33 @@ beforeEach(() => {
     ],
   });
   vi.mocked(api.retentionDirectory).mockResolvedValue({
-    total: 2500, offset: 0, limit: 16,
-    items: [{
-      household_key: "15", as_of_day: 711, horizon_days: 14,
-      segment: "at_risk", lapse_probability: 0.65, risk_rank: 1,
-      recency_days: 11, baskets_90d: 14,
-      typical_visit_gap_90d: 5, overdue_ratio: 2.2, sales_90d: 460,
-    }],
+    total: 2500,
+    offset: 0,
+    limit: 16,
+    items: [
+      {
+        household_key: "15",
+        as_of_day: 711,
+        horizon_days: 14,
+        segment: "at_risk",
+        lapse_probability: 0.65,
+        risk_rank: 1,
+        recency_days: 11,
+        baskets_90d: 14,
+        typical_visit_gap_90d: 5,
+        overdue_ratio: 2.2,
+        sales_90d: 460,
+      },
+    ],
   });
   const metric = {
-    model: "LightGBM", roc_auc: 0.7, avg_precision: 0.5,
-    brier: 0.2, lapse_rate: 0.28,
-    precision_at_capacity: 0.52, recall_at_capacity: 0.43,
+    model: "LightGBM",
+    roc_auc: 0.7,
+    avg_precision: 0.5,
+    brier: 0.2,
+    lapse_rate: 0.28,
+    precision_at_capacity: 0.52,
+    recall_at_capacity: 0.43,
     lift_at_capacity: 1.86,
   };
   vi.mocked(api.retentionResearch).mockResolvedValue({
@@ -195,16 +212,33 @@ beforeEach(() => {
       selected_model: "LightGBM",
       horizon_selection: "validation",
     },
-    horizons: [{ ...metric, horizon_days: 7 }, { ...metric, horizon_days: 14 }],
-    holdout: [metric, { ...metric, model: "Logistic regression", precision_at_capacity: .46 }],
+    horizons: [
+      { ...metric, horizon_days: 7 },
+      { ...metric, horizon_days: 14 },
+    ],
+    holdout: [
+      metric,
+      { ...metric, model: "Logistic regression", precision_at_capacity: 0.46 },
+    ],
     bootstrap: [],
     ablation: [{ ...metric, n_features: 25 }],
-    scenarios: [{ capacity: 0.20, contacts: 300,
-      assumed_incremental_response: .05,
-      break_even_incremental_response: .13,
-      hypothetical_net_value: -375 }],
-    replay: [{ as_of_day: 600, observed_lapse_rate: .28,
-      mean_predicted_risk: .27, prediction_psi_vs_validation: .01 }],
+    scenarios: [
+      {
+        capacity: 0.2,
+        contacts: 300,
+        assumed_incremental_response: 0.05,
+        break_even_incremental_response: 0.13,
+        hypothetical_net_value: -375,
+      },
+    ],
+    replay: [
+      {
+        as_of_day: 600,
+        observed_lapse_rate: 0.28,
+        mean_predicted_risk: 0.27,
+        prediction_psi_vs_validation: 0.01,
+      },
+    ],
     disclaimer: "Not causal ROI",
   });
 });
@@ -216,15 +250,25 @@ describe("Behind the Basket", () => {
     await user.click(screen.getByRole("button", { name: /Retention Lab/ }));
     expect(await screen.findByText("2,500")).toBeInTheDocument();
     expect(screen.getByText("Dormant households")).toBeInTheDocument();
-    const inspect = await screen.findByRole("button", { name: "Inspect retention household 15" });
+    const inspect = await screen.findByRole("button", {
+      name: "Inspect retention household 15",
+    });
     await user.click(inspect);
     const profile = screen.getByRole("dialog", { name: "Household #15" });
     expect(within(profile).getByText("Why this segment?")).toBeInTheDocument();
-    expect(within(profile).getByText("What can the business do?")).toBeInTheDocument();
-    expect(within(profile).getByText(/predicted no purchase in next 14 days/i)).toBeInTheDocument();
-    expect(screen.getByText("What would an offer have to achieve?")).toBeInTheDocument();
+    expect(
+      within(profile).getByText("What can the business do?"),
+    ).toBeInTheDocument();
+    expect(
+      within(profile).getByText(/predicted no purchase in next 14 days/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("What would an offer have to achieve?"),
+    ).toBeInTheDocument();
     await user.keyboard("{Escape}");
-    expect(screen.queryByRole("dialog", { name: "Household #15" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("dialog", { name: "Household #15" }),
+    ).not.toBeInTheDocument();
     expect(inspect).toHaveFocus();
   });
   it("searches the full directory and opens a detailed customer drawer without navigation", async () => {
