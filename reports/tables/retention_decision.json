@@ -1,6 +1,6 @@
 {
   "selected_horizon_days": 14,
-  "horizon_selection": "validation-only prevalence>=10% and <=75%, then best lift@20",
+  "horizon_selection": "explicitly supplied by user",
   "selected_model": "Logistic regression",
   "model_selection": "validation Precision@20: LightGBM must exceed LR by >=1.5 pp",
   "holdout_days": [
