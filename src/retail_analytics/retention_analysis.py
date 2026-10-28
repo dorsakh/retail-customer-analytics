@@ -240,6 +240,29 @@ def population_stability_index(reference, current) -> float:
     return float(np.sum((b - a) * np.log(b / a)))
 
 
+def holdout_heuristic_scores(holdout: pd.DataFrame) -> dict[str, np.ndarray]:
+    """Simple risk rankings; high scores always mean higher lapse risk.
+
+    Rank combinations are computed within each as-of day, consistent with
+    the per-day 20% contact-capacity evaluation.
+    """
+    recency = holdout["recency_days"].astype(float)
+    negative_frequency = -holdout["baskets_90d"].astype(float)
+    by_day = holdout["as_of_day"]
+    combined_ranks = (
+        recency.groupby(by_day).rank(pct=True)
+        + negative_frequency.groupby(by_day).rank(pct=True)
+    )
+    return {
+        "Recency": recency.to_numpy(dtype=float),
+        "Low frequency": negative_frequency.to_numpy(dtype=float),
+        "Recency + low frequency": combined_ranks.to_numpy(dtype=float),
+        "Recency / visit interval": holdout["overdue_ratio"].fillna(
+            recency
+        ).to_numpy(dtype=float),
+    }
+
+
 def run_evaluation(data: pd.DataFrame, *, horizon: int | None = None,
                    bootstraps: int = 500, gross_margin: float = 15.0,
                    contact_cost: float = 2.0) -> dict:
@@ -282,12 +305,7 @@ def run_evaluation(data: pd.DataFrame, *, horizon: int | None = None,
     ablation.to_csv(REPORTS / "retention_ablation.csv", index=False)
 
     development = pd.concat([train, validation], ignore_index=True)
-    holdout_scores: dict[str, np.ndarray] = {
-        "Recency": holdout["recency_days"].to_numpy(dtype=float),
-        "Recency / visit interval": holdout["overdue_ratio"].fillna(
-            holdout["recency_days"]
-        ).to_numpy(dtype=float),
-    }
+    holdout_scores = holdout_heuristic_scores(holdout)
     fitted_for_replay = None
     replay_columns = None
     for name, estimator in (
@@ -337,7 +355,7 @@ def run_evaluation(data: pd.DataFrame, *, horizon: int | None = None,
             **stats,
             "model_trained_through_day": max(VALIDATION_DAYS),
         })
-    pd.DataFrame(replay).to_csv(REPORTS / "retention_replay.csv", index=False)
+    pd.DataFrame(replay).to_csv(REPORTS / "retention_holdout_by_date.csv", index=False)
     from .retention_data import coverage_summary
     coverage_summary(data).to_csv(REPORTS / "retention_coverage.csv", index=False)
     decision = {
