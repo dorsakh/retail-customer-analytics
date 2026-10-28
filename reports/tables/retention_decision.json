@@ -1,0 +1,19 @@
+{
+  "selected_horizon_days": 14,
+  "horizon_selection": "validation-only prevalence>=10% and <=75%, then best lift@20",
+  "selected_model": "Logistic regression",
+  "model_selection": "validation Precision@20: LightGBM must exceed LR by >=1.5 pp",
+  "holdout_days": [
+    600,
+    630,
+    660
+  ],
+  "holdout_n": 5808,
+  "holdout_households": 2163,
+  "train_end_day": 510,
+  "validation_end_day": 570,
+  "future_labels_available_through_day": 674,
+  "hypothetical_margin_per_incremental_purchase": 15.0,
+  "hypothetical_cost_per_contact": 2.0,
+  "note": "Observed lapse outcomes, not incremental promotion response or ROI"
+}

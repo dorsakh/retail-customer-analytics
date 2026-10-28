@@ -2,6 +2,8 @@
 
 Concise implementation details behind the metrics in the [README](../README.md).
 
+**Parallel retention research:** The new [customer lapse v2 contract](RETENTION.md) documents a distinct target, eligibility rules, horizon comparison, feature-family ablations, holdout evaluation, and scenario economics. All metrics below refer to the original seven-day purchase model (`v1`), not v2.
+
 ## Dataset and modeling contract
 
 | Quantity | Value |

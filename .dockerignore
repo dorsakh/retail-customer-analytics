@@ -10,7 +10,10 @@ __pycache__
 .env.*
 !.env.example
 data/
-reports/
+reports/figures/
+reports/tables/scored_day_*.csv
+reports/tables/holdout_latest_day_scores.csv
+reports/tables/retention_private_*.csv
 tests/
 notebooks/
 frontend/node_modules/

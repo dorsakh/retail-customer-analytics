@@ -29,6 +29,7 @@ RUN python -m pip install --no-cache-dir ".[serving,inference]"
 
 # Include the versioned inference model.
 COPY artifacts/models/v1/ ./artifacts/models/v1/
+COPY reports/tables/ ./reports/tables/
 COPY --from=frontend-build /frontend/dist/ ./frontend_dist/
 
 # Prepare a writable reports directory.

@@ -6,6 +6,7 @@ import {
   FlaskConical,
   GitCompareArrows,
   LayoutGrid,
+  ShieldAlert,
   Menu,
   ShoppingBasket,
   X,
@@ -16,8 +17,9 @@ const Challenge = lazy(() => import("./pages/Challenge"));
 const Directory = lazy(() => import("./pages/Directory"));
 const Health = lazy(() => import("./pages/Health"));
 const Paradox = lazy(() => import("./pages/Paradox"));
+const Retention = lazy(() => import("./pages/Retention"));
 
-type Page = "directory" | "paradox" | "challenge" | "health";
+type Page = "directory" | "retention" | "paradox" | "challenge" | "health";
 
 const navigation = [
   {
@@ -27,18 +29,24 @@ const navigation = [
     number: "01",
   },
   {
+    key: "retention",
+    label: "Retention Lab",
+    icon: ShieldAlert,
+    number: "02",
+  },
+  {
     key: "paradox",
     label: "Behavioral Paradox",
     icon: GitCompareArrows,
-    number: "02",
+    number: "03",
   },
   {
     key: "challenge",
     label: "Beat the Model",
     icon: FlaskConical,
-    number: "03",
+    number: "04",
   },
-  { key: "health", label: "Model Pulse", icon: Activity, number: "04" },
+  { key: "health", label: "Model Pulse", icon: Activity, number: "05" },
 ] as const;
 
 export default function App() {
@@ -167,6 +175,7 @@ export default function App() {
             }
           >
             {page === "directory" && <Directory onPick={setCustomerKey} />}
+            {page === "retention" && <Retention />}
             {page === "paradox" && <Paradox onPick={setCustomerKey} />}
             {page === "challenge" && <Challenge />}
             {page === "health" && <Health />}

@@ -18,7 +18,8 @@ modeling = [
     "numpy>=1.26",
     "scikit-learn>=1.6",
     "lightgbm>=4.5",
-    "xgboost>=2.1"
+    "xgboost>=2.1",
+    "joblib>=1.4"
 ]
 
 dev = [

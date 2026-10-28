@@ -6,6 +6,9 @@ import type {
   MonitoringReport,
   ParadoxPair,
   PipelineRun,
+  RetentionDirectory,
+  RetentionOverview,
+  RetentionResearch,
 } from "./types";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -69,4 +72,26 @@ export const api = {
     request<MonitoringReport>("/monitoring/latest", { signal }),
   runs: (signal?: AbortSignal) =>
     request<PipelineRun[]>("/pipeline/runs?limit=8", { signal }),
+  retentionOverview: (signal?: AbortSignal) =>
+    request<RetentionOverview>("/retention/overview", { signal }),
+  retentionDirectory: (
+    parameters: {
+      q?: string;
+      segment?: string;
+      sort?: string;
+      limit?: number;
+      offset?: number;
+    },
+    signal?: AbortSignal,
+  ) =>
+    request<RetentionDirectory>(
+      `/retention/directory?${new URLSearchParams(
+        Object.entries(parameters)
+          .filter(([, value]) => value !== undefined && value !== "")
+          .map(([key, value]) => [key, String(value)]),
+      )}`,
+      { signal },
+    ),
+  retentionResearch: (signal?: AbortSignal) =>
+    request<RetentionResearch>("/retention/research", { signal }),
 };

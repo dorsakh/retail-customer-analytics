@@ -35,3 +35,4 @@ frontend/coverage/
 # Household-level exports; keep only intentionally selected aggregate reports
 reports/tables/scored_day_*.csv
 reports/tables/holdout_latest_day_scores.csv
+reports/tables/retention_private_*.csv

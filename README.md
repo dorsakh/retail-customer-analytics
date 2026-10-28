@@ -1,123 +1,131 @@
-# Retail Customer Analytics
+# Behind the Basket — Retail Retention Analytics
+
+**Problem:** Which repeat shoppers are likely to make **no purchase in the next 14 days**?
+
+**Decision:** Rank customers for retention review while keeping **all 2,500 known households** visible—including those too inactive to score reliably.
+
+**Result:** On a chronological holdout, the selected Logistic Regression achieved **45.5% Precision@20%**, **2.38× lift**, and **0.802 ROC-AUC**: **+8.43 percentage points** over a recency baseline (95% household-bootstrap CI **+5.96 to +11.80 pp**). This predicts *lapse*, **not coupon response or incremental revenue**.
 
 [![Python Tests](https://github.com/dorsakh/retail-customer-analytics/actions/workflows/python-tests.yml/badge.svg)](https://github.com/dorsakh/retail-customer-analytics/actions/workflows/python-tests.yml)
 [![React Frontend](https://github.com/dorsakh/retail-customer-analytics/actions/workflows/frontend-tests.yml/badge.svg)](https://github.com/dorsakh/retail-customer-analytics/actions/workflows/frontend-tests.yml)
 
-**An end-to-end customer repurchase prediction system:** PostgreSQL data modeling, temporally evaluated LightGBM, versioned batch inference, drift monitoring, and a React customer explorer. Built on the [dunnhumby *The Complete Journey*](https://www.dunnhumby.com/source-files/) retail dataset.
+**Python · SQL · PostgreSQL · scikit-learn · LightGBM · FastAPI · React · TypeScript · Recharts · Docker · pytest · Vitest · GitHub Actions**
 
-**Python · SQL · PostgreSQL · LightGBM · scikit-learn · FastAPI · React · TypeScript · Vite · Recharts · Docker Compose · pytest · Vitest · GitHub Actions**
+[**Watch the 55-second application walkthrough**](docs/assets/behind_the_basket_demo.mp4) · [Architecture](#architecture) · [Reproduce locally](#run-and-verify) · [Retention methodology](docs/RETENTION.md) · [Engineering notes](docs/ENGINEERING.md)
 
-**[Watch the 58-second application walkthrough](docs/assets/retail_demo.mp4)** · [Local setup](docs/SETUP.md)
+[![Retention Lab: real 2,500-household roster, at-risk queue, and 14-day lapse model](docs/assets/retention_overview.png)](docs/assets/behind_the_basket_demo.mp4)
 
-![Customer Explorer showing the scored household directory](docs/assets/customer_explorer.png)
+*Local application with the original dunnhumby data. Click the screenshot for the 55-second MP4 walkthrough; this is not a publicly hosted web app.*
 
-## Results at a glance
+## Business decision and coverage
 
-| Historical evaluation | Result |
-|---|---:|
-| Transaction lines / baskets / source households | **2.60M / 276,484 / 2,500** |
-| Labeled observations / modeled households | **41,507 / 2,493** |
-| Chronological holdout | **6,977 observations** across 3 future dates |
-| LightGBM ROC-AUC / average precision | **0.809 / 0.858** |
-| Holdout Brier score | **0.176** |
-| Precision@20% / lift | **94.1% / 1.64×** |
-| Gain over recency–frequency ranking at the same capacity | **+13.9 percentage points** (95% household-bootstrap CI: +11.8 to +15.9 pp) |
-| Latest production-style batch | **2,326 households** scored at observation day 711 |
+The **Retention Lab** presents a risk-ranked shortlist, individual customer inspection, historical model evidence, and explicitly hypothetical campaign economics.
 
-At 20% selection capacity, the model ranked **194 more observed future-purchase instances** in its shortlist than the recency/frequency baseline (1,397 selected observations in either strategy). This measures **ranking quality**, not incremental conversions or revenue caused by targeting.
+| Day-711 segment | Households | Treatment |
+|---|---:|---|
+| Active | 1,543 | Scored; below the top-risk cutoff |
+| **At risk** | **386** | **Top 20% predicted lapse risk among eligible households** |
+| Inactive / dormant | 280 / 174 | Visible; separate lifecycle rules |
+| Limited history | 117 | Visible; insufficient evidence to score |
+| **Total** | **2,500** | **1,929 model-scored + 571 unscored** |
 
-![Holdout Precision@20% and household-bootstrap intervals](docs/assets/holdout_precision_ci.png)
+A high lapse score helps choose **whom to investigate or include in a controlled campaign test**. It does not establish that an offer will change their behavior.
 
-## System overview
+## Historical evaluation
+
+Features are computed *as of each prediction date* from past transactions. The untouched holdout spans **days 600/630/660**, containing **5,808 household-date observations** from **2,163 distinct households**.
+
+| Holdout model | ROC-AUC | Precision@20% | Lift@20% |
+|---|---:|---:|---:|
+| Recency baseline | 0.676 | 37.1% | 1.94× |
+| **Logistic Regression (chosen)** | **0.802** | **45.5%** | **2.38×** |
+| LightGBM | 0.804 | 45.3% | 2.37× |
+
+The model identified **529 observed lapse instances** in the shortlist versus **431** for recency at identical capacity (**+98 instances**, not necessarily distinct customers). The LightGBM–LR difference was inconclusive under paired household bootstrap, so a **validation-defined simplicity rule** selected LR.
+
+The **14-day horizon** was also selected on validation only: 7/14/28-day comparisons used Lift@20% among horizons with 10–75% lapse prevalence. The 28-day outcome fell below that prevalence criterion. Six feature families—behavior, purchase cadence, product mix, promotions, demographics, and seasonality—were tested; feature-family ablation used **LightGBM on validation**.
+
+**Offer economics:** With *assumed* CAD $2 cost per contact and CAD $15 margin per incremental purchase, break-even requires **13.3% incremental response** (`2 / 15`). This is a scenario threshold, **not a measured response rate, causal uplift, or realized profit**. Historical replay checks risk, outcomes, and distribution drift on three later dates.
+
+## Architecture
 
 ```mermaid
 flowchart TD
-    A["Retail transaction CSVs"] --> B["PostgreSQL raw → core → analytics"]
-    B --> C["15 point-in-time features · 90-day history"]
-    C --> D["Benchmark + temporal validation"]
-    D --> E["Frozen-model chronological holdout"]
-    E -. "After evaluation" .-> F["Final refit · LightGBM v1 artifact"]
-    C --> F
-    C --> G["Day-711 batch scoring"]
-    F --> G
-    G --> H["PostgreSQL predictions + run audit"]
-    H --> I["FastAPI + React explorer"]
-    H --> J["PSI + delayed-outcome monitoring"]
+    A["dunnhumby transactions · 2.60M lines"] --> B["PostgreSQL · raw/core/feature marts"]
+    B --> C["Point-in-time features and 7/14/28-day targets"]
+    C --> D["Validation · horizon, model, ablations"]
+    D --> E["Fixed holdout · baselines and household bootstrap"]
+    E --> F["Final LR refit · versioned lapse_v2 artifact"]
+    F --> G["Day-711 batch scoring · 2,500-household roster"]
+    G --> H["PostgreSQL retention scores · FastAPI"]
+    H --> I["React · Retention Lab and Inspect"]
+    E --> J["Offline replay and profit scenarios"]
     J --> I
+    B --> K["Separate v1 · 7-day repurchase LightGBM"]
+    K --> I
 ```
 
-| Component | Engineering implementation |
+## Product walkthrough
+
+| Household-level decision support | Evidence and model validation |
 |---|---|
-| **Data platform** | Three PostgreSQL layers; referential, row-count, and monetary reconciliation; parameterized point-in-time feature marts; 15 behavioral inputs |
-| **Modeling** | Five-model benchmark, rolling-origin validation, fixed chronological holdout, probability diagnostics, feature importance, household-cluster bootstrap |
-| **Inference** | Native LightGBM `v1` artifact (~0.5 MB); exact feature-schema and SHA-256 checks; ranked probabilities and deciles stored through idempotent PostgreSQL upserts |
-| **Automation** | Batch validation, per-day PostgreSQL advisory locks, audited `running/succeeded/failed/skipped` states; optional 24-hour Docker Compose scheduler |
-| **Monitoring** | Feature/prediction population stability index (PSI), missingness alerts, delayed seven-day outcome evaluation, persisted operational reports |
-| **Delivery** | FastAPI/Pydantic/OpenAPI, React 19/TypeScript/Recharts, Docker image with non-root API container, automated Python and frontend CI |
+| [![At-risk household profile with observed history and 14-day lapse probability](docs/assets/retention_inspect.png)](docs/assets/retention_inspect.png) | [![Validation horizon comparison, holdout model baselines, ablation, and replay](docs/assets/retention_evidence.png)](docs/assets/retention_evidence.png) |
+| **Inspect:** risk, recent purchases, typical visit interval, and segment rationale. | **Evidence:** why 14 days and why LR; feature-family ablations and historical replay. |
 
-## Behind the Basket: customer explorer
+*Click either image to view the details at full resolution.*
 
-The React interface queries real PostgreSQL prediction and profile tables; the day-711 directory contains **all 2,326 scored households**, not a synthetic sample.
+The app also retains **Customer Explorer**, **Behavioral Paradox**, **Beat the Model**, and **Model Pulse** from the independent **v1 seven-day repurchase model**.
 
-- **Customer Explorer:** server-side search, sorting, and pagination; profile drawer with purchase timeline, 15 features, five cohort-relative shopping metrics, and live model inference.
-- **Behavioral Paradox:** compare households with similar recency and shopping frequency but different scores; inspect their feature differences and native LightGBM contributions without leaving the comparison.
-- **Beat the Model:** predict seven-day repurchase on historical holdout cases, then reveal the outcome and compare Brier losses against the holdout model.
-- **Model Pulse:** review persisted PSI/missingness reports and audited batch-execution history.
+<details>
+<summary><strong>More screenshots: business scenarios and original v1 explorer</strong></summary>
 
-The shared contextual customer drawer keeps the original view and selection visible. The compiled React app is served by FastAPI; Vite proxies the same API in development.
+The campaign panel shows sensitivity to a **hypothetical** incremental response rate. The original v1 views illustrate the separate purchase-propensity workflow.
 
-![Behavioral Paradox comparing customers with contrasting purchase probabilities](docs/assets/behavioral_paradox.png)
+![Hypothetical profit-versus-capacity curves and 13.3% break-even threshold](docs/assets/retention_scenarios.png)
 
-The screenshots and [one-minute walkthrough](docs/assets/retail_demo.mp4) were captured from the locally running application with the real-data PostgreSQL backend. This is a recorded demo, **not a publicly hosted service**.
+![Original customer explorer](docs/assets/customer_explorer.png)
 
-## Evaluation protocol
+![Original Behavioral Paradox](docs/assets/behavioral_paradox.png)
 
-| Partition | Observation days | Rows |
-|---|---|---:|
-| Training | 180–540, at 30-day intervals | 29,902 |
-| Validation | 570, 600 | 4,628 |
-| **Unseen chronological holdout** | **630, 660, 690** | **6,977** |
+</details>
 
-Every observation uses **15 features from the previous 90 days** to predict **any purchase in the following seven days**. The holdout estimator was fitted only through day 600. The saved `v1` scoring model was subsequently refitted on all 41,507 labeled observations; **its training-window predictions are not used as holdout metrics**. Whole-household bootstrap resampling accounts for repeated snapshots of the same household. See [technical notes](docs/ENGINEERING.md) for model comparisons, calibration, capacity curves, uncertainty, and limitations.
+## For technical reviewers
 
-## Run locally
+| Concern | Implementation and evaluation contract |
+|---|---|
+| **Data engineering** | 2.60M transaction lines / 276,484 baskets from [dunnhumby *The Complete Journey*](https://www.dunnhumby.com/source-files/); normalized PostgreSQL `raw`, `core`, and analytical marts; source reconciliation checks |
+| **Point-in-time safety** | One `(household_key, as_of_day)` per observation; 90-day purchase history, cutoff-bounded coupon/campaign information, 7/14/28-day prospective labels |
+| **Cohort policy** | Score repeat shoppers with ≥3 baskets in 90 days and ≤30 days since last visit; retain inactive, dormant, and limited-history households with explicit null risk |
+| **Temporal validation** | Train through day 510; validation days 540/570; untouched holdout days 600/630/660; frozen estimator before holdout; later independent final refit |
+| **Model governance** | Compare recency/overdue heuristics, Logistic Regression, and LightGBM; fixed 20% shortlist capacity; paired **500-replicate household-cluster bootstrap** |
+| **Operational implementation** | Versioned model artifact, PostgreSQL batch scores, FastAPI endpoints, React/TypeScript inspection, offline replay/PSI, Docker Compose, Python/React CI |
 
-The repository contains code, SQL definitions, tests, and the versioned model artifact; **the original transaction CSVs and PostgreSQL database are not included**. Reproducing the real-data explorer requires loading the source dataset, creating the analytical tables, and materializing explorer profiles first. Follow the [setup and runbook](docs/SETUP.md) for the full sequence.
+<details>
+<summary><strong>Open the methodological detail: horizon choice, feature ablations, uncertainty, and limitations</strong></summary>
+
+- **Horizon:** validation lapse prevalence was 35.4% (7d), 19.1% (14d), and 8.6% (28d). The 28-day horizon had higher lift but failed the predeclared ≥10% prevalence gate; the 14-day choice is operationally motivated, **not proven financially optimal**.
+- **Model choice:** LightGBM improved validation Precision@20% by only 0.26 pp over LR, below the preset 1.5-pp complexity threshold. On holdout, its slight precision difference was not distinguishable under the paired household bootstrap.
+- **Feature ablation:** behavioral-only versus six families (cadence, products, promotions, demographics, seasonality) used **LightGBM on validation**. Some families added little or no benefit. See [retention_ablation.csv](reports/tables/retention_ablation.csv).
+- **Replay:** a frozen development model evaluated historical days 600/630/660 with matured outcomes and PSI. This is a retrospective data replay, not production streaming or an independent new-customer cohort.
+- **Economics:** a 13.3% break-even threshold follows from *assumed* $2 contact cost ÷ $15 incremental contribution margin. This dataset does **not** identify who would buy *because of* an offer.
+- **Reproduction:** source dataset is not bundled. See [RETENTION.md](docs/RETENTION.md) for the SQL/data pipeline, model contract, artifact/version rules, command sequence, evaluation design, and [aggregate outputs](reports/tables).
+
+</details>
+
+## Run and verify
+
+The original [dunnhumby *The Complete Journey*](https://www.dunnhumby.com/source-files/) CSVs and populated database are **not included**. Prepare the real dataset with [SETUP.md](docs/SETUP.md), then apply the v2 SQL and environment configuration in [RETENTION.md](docs/RETENTION.md). **Preserve the existing database volume.**
 
 ```bash
-# Install modeling, serving, and test dependencies
 python -m pip install -e ".[modeling,serving,dev,reporting]"
-
-# Once the real-data database and model artifact are configured
-python -m retail_analytics.pipeline --dry-run
-python -m retail_analytics.pipeline
-python -m retail_analytics.monitor --as-of-day 711
-
-# Verify the Python code
+python -m retail_analytics.retention run --horizon auto --day 711
+docker compose up -d --build api
 python -m pytest -q
-
-# Build and test the React UI
 npm --prefix frontend ci
 npm --prefix frontend test
 npm --prefix frontend run build
 ```
 
-After preparing the PostgreSQL service as documented, the API and opt-in daily scheduler can run locally with `docker compose --profile automation up -d --build`. The React explorer is served on `http://127.0.0.1:8000/` in that Docker configuration.
+Open `http://127.0.0.1:8000/` after database preparation. Aggregate metrics are in [reports/tables](reports/tables); the model contract, splits, ablations, and limitations are in [RETENTION.md](docs/RETENTION.md).
 
-## Repository structure
-
-```text
-sql/{schema,load,marts,checks,analysis}/   PostgreSQL ELT, point-in-time features, validation
-src/retail_analytics/                    Training, evaluation, inference, monitoring, API
-frontend/src/{pages,components}/          React + TypeScript explorer
-tests/                                    Python unit and API tests
-docs/                                     Reproduction runbook and engineering notes
-reports/{tables,figures}/                 Selected aggregate results and visualizations
-artifacts/models/v1/                      Native model and integrity metadata
-.github/workflows/                       Python and React test/build CI
-Dockerfile, compose.yaml                  Local PostgreSQL/API/scheduler containers
-```
-
-**Verification:** 46 Python tests and 4 React UI tests at the documented release, plus type-checked frontend builds and GitHub Actions CI. Batch scoring is repeatable/idempotent; the day-711 monitoring outcome status is `pending` because the source dataset ends before that prediction window matures.
-
-**Scope:** Local Docker deployment and CI are implemented; public cloud hosting, automatic CD, MLflow tracking, and causal marketing-uplift measurement are **not** claimed. Results describe future purchase propensity for historically observed households, not cold-start generalization.
+**Scope:** A local, batch-oriented decision-support prototype with CI and retrospective monitoring; **not** a hosted app, real-time campaign engine, controlled uplift experiment, or validated estimate of marketing ROI. The preserved **v1** purchase-propensity results are documented separately in [ENGINEERING.md](docs/ENGINEERING.md).

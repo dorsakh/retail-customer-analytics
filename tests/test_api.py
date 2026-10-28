@@ -128,6 +128,28 @@ def test_invalid_limit(client):
     assert response.status_code == 422
 
 
+def test_retention_directory_is_paginated_and_segment_safe(monkeypatch, client):
+    seen = []
+
+    def fake_fetch(query, params=None):
+        seen.append((query, params))
+        if "COUNT(*) AS total" in query:
+            return [{"total": 1}]
+        return [{"household_key": "5", "segment": "dormant"}]
+
+    monkeypatch.setattr(api, "fetch_rows", fake_fetch)
+    response = client.get("/retention/directory", params={
+        "segment": "dormant", "q": "5", "sort": "recency", "limit": 1,
+    })
+    assert response.status_code == 200
+    assert response.json()["total"] == 1
+    assert response.json()["items"][0]["segment"] == "dormant"
+    assert seen[0][1]["term"] == "5"
+    assert ":term" in seen[0][0]
+    assert "recency_days DESC" in seen[1][0]
+    assert client.get("/retention/directory", params={"sort": "random()"}).status_code == 422
+
+
 def test_explorer_directory_search_is_paginated_and_parameterized(monkeypatch, client):
     calls = []
 
