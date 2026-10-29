@@ -19,6 +19,26 @@ jobs:
       matrix:
         python-version: ["3.11", "3.13"]
 
+    # Empty database for the SQL fixture tests; live-data tests skip without the dataset
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: retail
+          POSTGRES_PASSWORD: retail
+          POSTGRES_DB: retail_analytics
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U retail -d retail_analytics"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      RETAIL_DATABASE_URL: postgresql+psycopg://retail:retail@localhost:5432/retail_analytics
+      REQUIRE_POSTGRES: "1"
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7

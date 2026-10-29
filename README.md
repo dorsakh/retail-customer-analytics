@@ -6,6 +6,8 @@
 
 **Result:** On a chronological holdout, Logistic Regression reached **45.5% Precision@20%**, **2.38× lift**, and **0.802 ROC-AUC**. A strong frequency-only rule reached **43.9%**; the **+1.55-pp** difference was inconclusive under household bootstrap. This predicts a *short-term lapse*, **not permanent churn, coupon response, or incremental revenue**.
 
+**Descriptive analytics:** PostgreSQL SQL over the same data produces reconciled 28-day business KPIs, first-observed cohort retention, and RFM customer segmentation. See [Descriptive business analytics](#descriptive-business-analytics).
+
 [![Python Tests](https://github.com/dorsakh/retail-customer-analytics/actions/workflows/python-tests.yml/badge.svg)](https://github.com/dorsakh/retail-customer-analytics/actions/workflows/python-tests.yml)
 [![React Frontend](https://github.com/dorsakh/retail-customer-analytics/actions/workflows/frontend-tests.yml/badge.svg)](https://github.com/dorsakh/retail-customer-analytics/actions/workflows/frontend-tests.yml)
 
@@ -119,6 +121,36 @@ The campaign panel shows sensitivity to a **hypothetical** incremental response 
 
 </details>
 
+## Descriptive business analytics
+
+PostgreSQL SQL over the same `analytics.baskets` mart reports business KPIs, first-observed cohort retention, and RFM value segmentation. These are descriptive results, separate from the predictive lifecycle segments above.
+
+**Definitions.** *Recorded Sales Value* is `SUM(sales_value)`, which the source documents as the amount the retailer receives. Manufacturer coupons may be reimbursed, so it is not necessarily what customers paid. It is also not net revenue or profit: the data records no returns, refunds, cancellations, tax, or cost. It **includes fuel**, which accounts for **7.87%** of the $8.06M total; fuel quantities make item-unit metrics meaningless, so none are reported. KPIs use **28-day periods** (four whole weeks; the data has day numbers, not calendar dates). *Average basket value* = Recorded Sales Value ÷ all baskets, including the 942 zero-value baskets (0.34%). Periods 1–5 (days 1–140), when ≥1% of households were first observed, are flagged as **panel ramp**. Period 26 (11 days) is flagged **incomplete**. Both stay in [period_kpis.csv](reports/tables/period_kpis.csv) but are excluded from like-for-like comparisons.
+
+**Measured insights.** The like-for-like comparison uses periods **6–9 (days 141–252)** and **19–22 (days 505–616)**. Those windows are 364 days (13 × 28) apart, or 52 weeks, so they are approximately season-aligned. Each window value is the unweighted mean of four period-level KPIs ([kpi_like_for_like.csv](reports/tables/kpi_like_for_like.csv)). These are observed differences, not established causes.
+
+1. **Higher average basket value accounts for most of the observed difference, more than reach or frequency.** Recorded Sales Value per period was **6.5%** higher in the later window ($327,528 → $348,852). Active households (households with at least one basket) were **2.0%** higher (1,980 → 2,020), and Recorded Sales Value per active household was **4.4%** higher ($165.44 → $172.65). Baskets per active household were **0.7%** lower (5.94 → 5.90). Average basket value (Recorded Sales Value ÷ all baskets) was **5.1%** higher ($27.86 → $29.30). The data does not show whether the higher basket value reflects prices, product mix, or something else.
+2. **Recorded Sales Value is concentrated in the top RFM segments.** In the trailing 182 days to the end of day 711, *Champions* are **22.9%** of households and **51.5%** of Recorded Sales Value. Together with *Loyal*, **44.4%** of households account for **77.6%**. The largest segment, *Low value, less recent* (**28.0%** of households), contributes **6.4%**. Some concentration is built in, because monetary value is one of the inputs that defines the segments.
+3. **Cohort activity is flat rather than decaying.** Across the four first-observed cohorts and their first six **30-day** periods, **78.5–81.8%** of households purchased in each period. 2,491 of 2,500 households first appear in days 1–120. That pattern is consistent with panel enrollment of existing shoppers, so these cohorts cannot show retention decay after acquisition.
+4. **Fuel's share varies by period.** Across like-for-like periods, fuel ranged from **6.8% to 10.7%** of Recorded Sales Value. Between the two comparison windows its mean share moved only **−0.3 pp** (8.7% → 8.4%). Period-to-period changes in total Recorded Sales Value include this fuel variation.
+
+![Like-for-like 28-day KPI values with the two comparison windows shaded](reports/figures/kpi_trend.png)
+
+<details>
+<summary><strong>Cohort retention and RFM figures, definitions, and validation</strong></summary>
+
+![Share of each first-observed cohort purchasing in each 30-day period](reports/figures/cohort_retention.png)
+
+![RFM segments: household share vs Recorded Sales Value share](reports/figures/rfm_value_concentration.png)
+
+- **SQL:** [period_kpis.sql](sql/analysis/period_kpis.sql), [cohort_retention.sql](sql/analysis/cohort_retention.sql) (unchanged 30-day logic), [rfm_segments.sql](sql/analysis/rfm_segments.sql).
+- **RFM:** recency uses complete history; frequency and Recorded Sales Value use days 530–711. Each is scored 1–5 by quintile among the 2,432 households with a purchase in that window, and ties share a score. The 68 households with no purchase in the window form their own segment.
+- **Discount fields** (loyalty, coupon match, manufacturer coupon) are reported as separate recorded amounts. No customer-discount rate is derived, because the source does not define one.
+- **Validation:** [kpi_reconciliation.sql](sql/checks/kpi_reconciliation.sql) reconciles the basket mart with core line items: sales, baskets, households, 28-day period sales, and RFM-window sales. It also confirms there are no negative sales lines and no multi-day baskets. SQL fixture tests run against a PostgreSQL service in CI; live-data reconciliation tests run locally.
+- **Reproduce:** `python -m retail_analytics.descriptive` (requires the `reporting` extra and the populated database).
+
+</details>
+
 ## Run and verify
 
 The original [dunnhumby *The Complete Journey*](https://www.dunnhumby.com/source-files/) CSVs and populated database are **not included**. Prepare the real dataset with [SETUP.md](docs/SETUP.md), then apply the v2 SQL and environment configuration in [RETENTION.md](docs/RETENTION.md). **Preserve the existing database volume.**
@@ -131,6 +163,12 @@ python -m pytest -q
 npm --prefix frontend ci
 npm --prefix frontend test
 npm --prefix frontend run build
+```
+
+To regenerate the descriptive KPI, cohort, and RFM tables and figures, first complete the database preparation in [SETUP.md](docs/SETUP.md). The command reads the populated PostgreSQL database and needs the `reporting` extra installed above:
+
+```bash
+python -m retail_analytics.descriptive
 ```
 
 Open `http://127.0.0.1:8000/` after database preparation. Aggregate metrics are in [reports/tables](reports/tables); the model contract, splits, ablations, and limitations are in [RETENTION.md](docs/RETENTION.md).
