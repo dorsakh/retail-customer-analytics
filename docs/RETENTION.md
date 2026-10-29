@@ -114,9 +114,9 @@ Marketing assumptions are configurable (default: hypothetical CAD 15 contributio
 
 ## Feature families and ablation
 
-- **Behavioral:** recency, basket and sales counts for 30/90-day periods, changes in sales, basket value variability, store variety, basket diversity, discount share.
+- **Behavioral:** recency, basket counts and Recorded Sales Value (`sales_value`) for 30/90-day periods, changes in Recorded Sales Value, basket value variability, store variety, basket diversity, discount share.
 - **Cadence:** median days between purchase dates, interval variability, current gap relative to typical gap.
-- **Products:** past-90-day department diversity, grocery sales share, private-label sales share.
+- **Products:** past-90-day department diversity, grocery and private-label shares of Recorded Sales Value.
 - **Promotions:** historical campaign assignments known by the cutoff; recorded coupon redemptions through the cutoff (redemption is **not** coupon receipt or treatment assignment).
 - **Seasonality:** seven-day cycle and day-index annual Fourier terms (relative day-index, not verified Gregorian weekdays).
 - **Demographics:** categorical age, income, and household-size attributes when available; explicit unknown category for uncovered households.
