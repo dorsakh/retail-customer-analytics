@@ -1,0 +1,7 @@
+metric,label,definition,early_periods,early_days,late_periods,late_days,early_mean,late_mean,change_pct,change_pp
+recorded_sales_value,Recorded Sales Value,"SUM(sales_value) in the 28-day period, fuel included",6-9,141-252,19-22,505-616,327527.81,348851.85,6.51,
+active_households,Active households,Households with at least one basket in the period,6-9,141-252,19-22,505-616,1979.75,2020.25,2.05,
+sales_per_active_household,Recorded Sales Value per active household,Recorded Sales Value / active households,6-9,141-252,19-22,505-616,165.44,172.65,4.36,
+baskets_per_active_household,Baskets per active household,"All baskets, including zero-value, / active households",6-9,141-252,19-22,505-616,5.94,5.9,-0.67,
+average_basket_value,Average basket value,"Recorded Sales Value / all baskets, including zero-value",6-9,141-252,19-22,505-616,27.86,29.3,5.14,
+fuel_share_pct,Fuel share of Recorded Sales Value (%),Fuel Recorded Sales Value / Recorded Sales Value,6-9,141-252,19-22,505-616,8.73,8.41,,-0.32

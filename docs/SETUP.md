@@ -52,7 +52,7 @@ psql -d retail_analytics -v ON_ERROR_STOP=1 -f sql/schema/predictions.sql
 
 These are **fresh-load** instructions, not a repeatable append process. Source-data corrections may require appropriate core/mart rebuilds before re-scoring. The parity check covers days 300, 540, 600, 690.
 
-The project also includes descriptive SQL analyses in `sql/analysis/`: purchasing behavior, retention cohorts, and campaign activity. Campaign-period comparisons are descriptive, not experimental treatment effects.
+The project also includes descriptive SQL analyses in `sql/analysis/`: purchasing behavior, retention cohorts, and campaign activity. Campaign-period comparisons are descriptive, not experimental treatment effects. Business KPIs (28-day periods) and RFM segments are reconciled with `sql/checks/kpi_reconciliation.sql` and exported, with figures, by `python -m retail_analytics.descriptive`.
 
 ## 2. Reproduce holdout results
 

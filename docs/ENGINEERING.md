@@ -17,7 +17,7 @@ Concise implementation details behind the metrics in the [README](../README.md).
 | Feature lookback / target horizon | 90 days / 7 days |
 | Point-in-time model inputs | 15 |
 
-The seven source CSVs populate `raw`, normalized `core`, and derived `analytics` PostgreSQL schemas. Data integrity checks cover candidate keys, nulls, duplicate associations, basket consistency, transaction/quantity/sales totals, and analytical feature parity. Coupon-product mappings are deduplicated in the core layer to avoid downstream join multiplication while retaining source records.
+The seven source CSVs populate `raw`, normalized `core`, and derived `analytics` PostgreSQL schemas. Data integrity checks cover candidate keys, nulls, duplicate associations, basket consistency, transaction/quantity/`sales_value` totals, and analytical feature parity. Coupon-product mappings are deduplicated in the core layer to avoid downstream join multiplication while retaining source records.
 
 Each observation is `(household_key, as_of_day)` with binary `repurchased_7d` indicating any purchase in the following seven days. Historical observation dates are 30 days apart, so prediction windows do not overlap.
 
@@ -27,7 +27,7 @@ Each observation is `(household_key, as_of_day)` with binary `repurchased_7d` in
 |---|---|
 | Recency | `recency_days` |
 | Frequency | `baskets_90d`, `baskets_30d`, `baskets_previous_30d` |
-| Monetary | `sales_90d`, `sales_30d`, `sales_previous_30d`, `sales_growth_30d` |
+| Monetary (Recorded Sales Value) | `sales_90d`, `sales_30d`, `sales_previous_30d`, `sales_growth_30d` |
 | Basket composition | `avg_basket_value_90d`, `basket_value_volatility_90d`, `avg_product_diversity_90d` |
 | Store/promotion | `distinct_stores_90d`, `discount_share_90d` |
 | Visit timing | `avg_days_between_visits_90d`, `visit_interval_volatility_90d` |

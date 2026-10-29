@@ -1,0 +1,7 @@
+segment_order,segment,households,household_share_pct,window_baskets,window_sales_value,sales_share_pct,median_recency_days,baskets_per_household,sales_value_per_household
+1,Champions,572,22.88,40299.0,1206352.35,51.47,1.0,70.45,2109.01
+2,Loyal,537,21.48,18269.0,612408.56,26.13,4.0,34.02,1140.43
+3,"Recent, lower value",359,14.36,4408.0,99765.15,4.26,3.0,12.28,277.9
+4,"Valuable, less recent",263,10.52,7544.0,275208.64,11.74,15.0,28.68,1046.42
+5,"Low value, less recent",701,28.04,5651.0,150131.64,6.41,31.0,8.06,214.17
+6,No purchase in window,68,2.72,0.0,0.0,0.0,276.0,0.0,0.0

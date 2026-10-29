@@ -1,6 +1,10 @@
 -- Retention of households grouped by their first observed purchase
 -- Periods are 30-day intervals relative to each household's first purchase
 -- Only fully observable periods are included in the denominator
+-- Cohorts reflect the first purchase observed in the panel, not verified
+-- customer acquisition: 2,491 of 2,500 households first appear in days 1-120,
+-- consistent with panel enrollment waves
+-- Uses 30-day periods, unlike the 28-day business KPI periods in period_kpis.sql
 
 WITH observation_window AS (
     SELECT MAX(day) AS last_observed_day
